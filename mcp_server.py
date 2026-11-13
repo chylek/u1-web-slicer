@@ -600,7 +600,7 @@ def handle(m):
         return {
             "protocolVersion": m["params"].get("protocolVersion", "2025-06-18"),
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "u1web", "version": "1.0"},
+            "serverInfo": {"name": "u1web", "version": config.VERSION},
             "instructions": f"Snapmaker U1 slicer session shared live with the user's browser UI ({API}). "
             "Call get_scene first; edits are visible to the user immediately.",
         }

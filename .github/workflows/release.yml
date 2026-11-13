@@ -1,0 +1,49 @@
+# Push a version tag without a "v" (git tag 0.2.0 && git push origin 0.2.0): runs the checks, publishes
+# ghcr.io/chylek/u1-web-slicer:<version>, :<version>-orca<orca version> and :latest, and creates a GitHub release.
+name: release
+on:
+  push:
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
+
+env:
+  ORCA_VERSION: 2.4.1
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            ORCA_VERSION=${{ env.ORCA_VERSION }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}-orca${{ env.ORCA_VERSION }}
+            ghcr.io/${{ github.repository }}:latest
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<NOTES
+          Image: \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\` (bundles Snapmaker Orca ${{ env.ORCA_VERSION }}).
+          Update: \`docker compose pull && docker compose up -d\`.
+
+          Snapmaker Orca is AGPL-3.0; its source is at https://github.com/Snapmaker/OrcaSlicer/tree/v${{ env.ORCA_VERSION }}.
+          NOTES
+          gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file notes.md --generate-notes

@@ -342,7 +342,7 @@ class H(BaseHTTPRequestHandler):
                 try:
                     return self._json(printer.status())
                 except OSError as e:
-                    return self._json({"error": f"printer {printer.HOST} unreachable: {e}"}, 502)
+                    return self._json({"error": f"printer unreachable ({printer.HOST or 'no U1_HOST'}): {e}"}, 502)
             if u.path == "/api/printer/camera.jpg":  # stock camera needs a keepalive; wake at most every 8 s
                 try:
                     if time.time() - printer._last_wake > 8:
@@ -496,7 +496,7 @@ class H(BaseHTTPRequestHandler):
                         return self._json({"exists": True, "file": name})
                     return self._json(printer.upload(g, name, start=bool(r.get("start"))))
                 except OSError as e:
-                    return self._json({"error": f"printer {printer.HOST} unreachable: {e}"}, 502)
+                    return self._json({"error": f"printer unreachable ({printer.HOST or 'no U1_HOST'}): {e}"}, 502)
             if u.path == "/api/profiles/save":
                 return self._json(S.profile_save(r.get("kind", "global"), r.get("name"), r.get("id"), r.get("part")))
             if u.path == "/api/filaments/save":
@@ -524,5 +524,5 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(f"u1web on http://0.0.0.0:{config.PORT}  data={JOBS}  models={ART}", file=sys.stderr)
+    print(f"u1web {config.VERSION} on http://0.0.0.0:{config.PORT}  data={JOBS}  models={ART}", file=sys.stderr)
     ThreadingHTTPServer(("0.0.0.0", config.PORT), H).serve_forever()

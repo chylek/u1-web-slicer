@@ -1,6 +1,6 @@
 [project]
 name = "u1-web-slicer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Phone-first web slicer for the Snapmaker U1, driving the Snapmaker Orca CLI"
 readme = "README.md"
 license = "AGPL-3.0-or-later"

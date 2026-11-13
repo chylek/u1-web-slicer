@@ -33,7 +33,7 @@ browser (static/, vanilla JS + three.js) ──REST + SSE──┐
                                                         ├── server.py ── session.py (state, ops, undo history)
 AI agent ── stdio ── mcp_server.py ──────── HTTP ───────┘        │
                                                                  ├── threemf.py   3MF read/write
-                                                                 ├── docker exec <container> snapmaker-orca --slice
+                                                                 ├── snapmaker-orca --slice  (bundled in the image)
                                                                  └── printer.py   Moonraker (status, upload, camera)
 ```
 
@@ -41,41 +41,50 @@ The server holds **one global session**. Browsers are views: they render the sta
 and send every edit as an operation (`POST /api/op`). See [docs/architecture.md](docs/architecture.md) for the
 modules, data layout and HTTP API.
 
-## Requirements
+## Install (Docker)
 
-- Linux host with Python 3.11+ and Pillow (`apt install python3-pil` or `pip install pillow`). No other Python
-  dependencies; the server uses the standard library.
-- **Snapmaker Orca 2.4.1 or newer** command line. The tested setup runs it in a docker container that also mounts
-  the data folder; see [deploy/orca](deploy/orca). Setting `U1WEB_ORCA_CONTAINER=` (empty) runs a local
-  `snapmaker-orca` binary instead.
-- A Snapmaker U1 reachable over the LAN for the printer features (optional).
-
-## Quick start
+The image bundles the server and the Snapmaker Orca CLI. It needs an x86-64 Linux host with Docker; Orca is not
+published for ARM, so a Raspberry Pi will not work.
 
 ```sh
-git clone https://github.com/chylek/u1-web-slicer && cd u1-web-slicer
-cp deploy/env.example .env          # then edit paths and the printer address
-docker compose --env-file .env -f deploy/orca/docker-compose.yml up -d   # Orca CLI container
-python3 server.py                   # http://<host>:3060
+mkdir u1web && cd u1web
+curl -fsSLO https://raw.githubusercontent.com/chylek/u1-web-slicer/main/deploy/docker-compose.yml
+# edit U1_HOST (your printer) and user (id -u:id -g) in docker-compose.yml
+mkdir data && docker compose up -d          # http://<host>:3060
 ```
+
+**Updates:** `docker compose pull && docker compose up -d`. Your session, history, presets and models live in
+`./data` and survive updates. Releases are listed on the GitHub releases page; pin a version
+(`image: ghcr.io/chylek/u1-web-slicer:0.2.0`) if you prefer to update deliberately.
 
 To try it, upload [examples/demo-cube.3mf](examples/demo-cube.3mf) from the project menu: a painted cube with a
 Full Spectrum orange side (rebuilt by `tools/make_demo.py`).
 
 Open the page on a phone and use the browser's "Install app" to get it as a full-screen app (needs HTTPS, for
 example behind the reverse proxy in [deploy/nginx.conf.example](deploy/nginx.conf.example)).
+
+### Without Docker
+
+Python 3.11+ with Pillow, plus a Snapmaker Orca 2.4.1+ install (`snapmaker-orca`, from its AppImage):
+
+```sh
+git clone https://github.com/chylek/u1-web-slicer && cd u1-web-slicer
+cp deploy/env.example .env      # paths, printer address, U1WEB_ORCA_BIN
+python3 server.py               # http://<host>:3060
+```
+
 A systemd unit is in [deploy/u1web.service](deploy/u1web.service).
 
 ## Configuration
 
-Environment variables, or a `.env` file next to `server.py` (see [deploy/env.example](deploy/env.example)):
+Environment variables (in Docker: the `environment:` block), or a `.env` file next to `server.py` for a checkout:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `U1WEB_DATA` | `~/.local/share/u1web` | jobs, session state, undo history, user presets |
+| `U1WEB_DATA` | `/data` in Docker, else `~/.local/share/u1web` | jobs, session state, undo history, user presets |
 | `U1WEB_MODELS` | `<data>/models` | folder of model subfolders; saved projects go to `<models>/u1web/` |
 | `U1WEB_PORT` | `3060` | HTTP port |
-| `U1WEB_ORCA_CONTAINER` | `orca-web` | container with the Orca CLI; empty = run it locally |
+| `U1WEB_ORCA_CONTAINER` | empty | run the Orca CLI in another container via `docker exec` instead of locally |
 | `U1WEB_DATA_IN_CONTAINER` | `/jobs` | where `U1WEB_DATA` is mounted inside that container |
 | `U1WEB_ORCA_BIN` | `/opt/orca/bin/snapmaker-orca` | slicer executable |
 | `U1_HOST` | unset | printer Moonraker `host:port`, e.g. `192.168.1.10:7125` |
@@ -98,10 +107,22 @@ zips are limited to 2000 files / 1 GB, starting a print is refused while the pri
 your client, for example Claude Code's `.mcp.json`:
 
 ```json
-{"mcpServers": {"u1web": {"type": "stdio", "command": "python3", "args": ["/path/to/u1-web-slicer/mcp_server.py"]}}}
+{"mcpServers": {"u1web": {"type": "stdio", "command": "docker", "args": ["exec", "-i", "u1web", "python3", "mcp_server.py"]}}}
 ```
 
+From a checkout, use `"command": "python3", "args": ["/path/to/u1-web-slicer/mcp_server.py"]` instead.
+
 Ask it things like "make the roof red and the walls a 50/50 mix of white and yellow, then slice plate 2".
+
+## Releases
+
+Tags are plain versions without a "v" (`0.2.0`). Pushing one runs the checks, publishes the image to
+`ghcr.io/chylek/u1-web-slicer` as `<version>`, `<version>-orca<orca version>` and `latest`, and creates a GitHub
+release with generated notes ([.github/workflows/release.yml](.github/workflows/release.yml)):
+
+```sh
+git tag 0.2.0 && git push origin 0.2.0
+```
 
 ## Development
 
@@ -123,7 +144,8 @@ checkout by the scripts in `tools/` (see their docstrings). There is no front-en
 - `base_project_settings.config`, `static/schema.json`, `presets.json` and `filaments.json` are derived from
   [Snapmaker Orca](https://github.com/Snapmaker/OrcaSlicer) profiles and option definitions (AGPL-3.0), and some
   file-format logic (paint trees, plate layout, mixed filaments) follows its source.
-- The slicer itself, Snapmaker Orca (AGPL-3.0), is not bundled; it runs as a separate program.
+- The Docker image bundles Snapmaker Orca (AGPL-3.0), unmodified, from its official AppImage; source:
+  https://github.com/Snapmaker/OrcaSlicer. Without Docker it runs as a separate program you install yourself.
 
 ## License
 

@@ -1,0 +1,14 @@
+# U1 Web Slicer with the Snapmaker Orca CLI built in. Start: docker compose up -d
+# Update: docker compose pull && docker compose up -d   (your data in ./data survives)
+services:
+  u1web:
+    image: ghcr.io/chylek/u1-web-slicer:latest   # or pin a release, e.g. :0.2.0
+    container_name: u1web
+    restart: unless-stopped
+    user: "1000:1000"            # owner of ./data on the host (id -u / id -g)
+    ports: ["3060:3060"]
+    environment:
+      U1_HOST: "192.168.1.10:7125"   # your printer's Moonraker address; remove to disable printer features
+      TZ: Etc/UTC
+    volumes:
+      - ./data:/data                 # session, undo history, jobs, presets; models in ./data/models

@@ -7,8 +7,8 @@ Variables (all optional):
                            (default <data>/models)
   U1WEB_PORT               HTTP port of server.py (default 3060)
   U1WEB_URL                where mcp_server.py reaches the server (default http://127.0.0.1:<port>)
-  U1WEB_ORCA_CONTAINER     docker container that has the Snapmaker Orca CLI; empty = run the CLI directly
-                           (default orca-web)
+  U1WEB_ORCA_CONTAINER     run the Snapmaker Orca CLI inside this docker container via `docker exec`
+                           (default empty = run U1WEB_ORCA_BIN directly, as the docker image does)
   U1WEB_ORCA_USER          user inside the container (default abc, the linuxserver.io convention)
   U1WEB_ORCA_BIN           slicer executable (default /opt/orca/bin/snapmaker-orca)
   U1WEB_DATA_IN_CONTAINER  path under which U1WEB_DATA is mounted inside the container (default /jobs)
@@ -32,17 +32,18 @@ DATA = Path(os.environ.get("U1WEB_DATA") or Path.home() / ".local/share/u1web").
 MODELS = Path(os.environ.get("U1WEB_MODELS") or DATA / "models").expanduser()
 PORT = int(os.environ.get("U1WEB_PORT") or 3060)
 URL = os.environ.get("U1WEB_URL") or f"http://127.0.0.1:{PORT}"
-ORCA_CONTAINER = os.environ.get("U1WEB_ORCA_CONTAINER", "orca-web")
+ORCA_CONTAINER = os.environ.get("U1WEB_ORCA_CONTAINER", "")
 ORCA_USER = os.environ.get("U1WEB_ORCA_USER") or "abc"
 ORCA_BIN = os.environ.get("U1WEB_ORCA_BIN") or "/opt/orca/bin/snapmaker-orca"
 DATA_IN_CONTAINER = os.environ.get("U1WEB_DATA_IN_CONTAINER") or ("/jobs" if ORCA_CONTAINER else str(DATA))
 PRINTER_HOST = os.environ.get("U1_HOST", "")
+VERSION = os.environ.get("U1WEB_VERSION", "dev")  # set by the docker image build
 
 
 def orca_command(args):
     """Command line that runs the Orca CLI with `args` (paths already translated with `in_container`)."""
-    if not ORCA_CONTAINER:
-        return [ORCA_BIN, *args]
+    if not ORCA_CONTAINER:  # the CLI needs a writable HOME
+        return ["env", f"HOME={DATA}/.home", ORCA_BIN, *args]
     return [
         "docker",
         "exec",
