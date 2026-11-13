@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#141619" />
+    <title>U1 Slicer</title>
+    <link rel="stylesheet" href="style.css" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+  </head>
+  <body>
+    <canvas id="cv"></canvas>
+
+    <header id="top" class="glass">
+      <button id="fileBtn" class="pill">
+        <span class="ic" data-i="folder"></span><span id="projName">Open project</span
+        ><span class="ic sm" data-i="chev"></span>
+      </button>
+      <span class="grow"></span>
+      <div class="seg mini" id="modeSeg">
+        <button data-mode="prep" class="on">Prepare</button><button data-mode="prev" disabled>Layers</button>
+      </div>
+      <button id="monBtn" class="ibtn" title="Monitor: camera and printer status">
+        <span class="ic" data-i="cam"></span>
+      </button>
+      <button id="undo" class="ibtn" title="Undo (Ctrl+Z)" disabled><span class="ic" data-i="undo"></span></button>
+      <button id="redo" class="ibtn" title="Redo (Ctrl+Shift+Z)" disabled>
+        <span class="ic" data-i="redo"></span>
+      </button>
+      <button id="save" class="ibtn" title="Save" disabled><span class="ic" data-i="save"></span></button>
+    </header>
+
+    <nav id="rail" class="glass">
+      <button class="ibtn" id="addBtn" title="Add object"><span class="ic" data-i="plus"></span></button
+      ><input id="add" type="file" accept=".stl,.3mf,.zip" hidden />
+      <button class="ibtn" data-a="arr" title="Arrange" disabled><span class="ic" data-i="grid"></span></button>
+      <i class="sep"></i>
+      <div class="gzw">
+        <button class="ibtn sel" data-a="gz" title="Move — tap to pick move / rotate / scale" disabled>
+          <span class="ic" data-i="move"></span>
+        </button>
+        <div id="gzMenu" class="glass" hidden>
+          <button class="ibtn" data-a="gz-move" title="Move"><span class="ic" data-i="move"></span></button
+          ><button class="ibtn" data-a="gz-rotate" title="Rotate"><span class="ic" data-i="rot3"></span></button
+          ><button class="ibtn" data-a="gz-scale" title="Scale"><span class="ic" data-i="scale"></span></button>
+        </div>
+      </div>
+      <button class="ibtn sel" data-a="lay" title="Lay on face: tap the face to put down" disabled>
+        <span class="ic" data-i="lay"></span>
+      </button>
+      <button class="ibtn sel" data-a="drop" title="Drop onto the bed" disabled>
+        <span class="ic" data-i="dropb"></span>
+      </button>
+      <button class="ibtn sel" data-a="dup" title="Duplicate" disabled><span class="ic" data-i="copy"></span></button>
+      <button class="ibtn sel" data-a="paint" title="Paint colours" disabled>
+        <span class="ic" data-i="brush"></span>
+      </button>
+      <button class="ibtn sel" data-a="set" title="Object settings" disabled>
+        <span class="ic" data-i="sliders"></span>
+      </button>
+      <button class="ibtn sel" data-a="del" title="Delete" disabled><span class="ic" data-i="trash"></span></button>
+    </nav>
+
+    <nav id="views" class="glass">
+      <button data-v="iso">3D</button><button data-v="top">Top</button><button data-v="front">Front</button
+      ><button data-v="ortho" title="Orthographic / perspective">Ortho</button
+      ><button data-v="ovh" title="Highlight overhangs that need support">Overhangs</button>
+    </nav>
+
+    <section id="sheet" class="glass" data-state="half">
+      <div id="grab"><i></i></div>
+      <div id="head">
+        <div id="summary"><b id="sumTitle">No project</b><small id="sumSub">Open a 3MF or add an STL</small></div>
+        <button id="slice" class="primary" disabled><span class="ic" data-i="layers"></span>Slice</button>
+      </div>
+      <div id="result" hidden></div>
+      <div class="seg" id="tabs">
+        <button data-t="obj" class="on">Objects</button><button data-t="fil">Filaments</button
+        ><button data-t="prn">Print</button>
+      </div>
+      <div id="body">
+        <div id="tab-obj" class="tab"></div>
+        <div id="tab-fil" class="tab" hidden></div>
+        <div id="tab-prn" class="tab" hidden>
+          <div class="card">
+            <div class="ct">Profiles</div>
+            <div id="profs"></div>
+          </div>
+          <div class="card">
+            <div class="ct">Print settings</div>
+            <div id="gset"></div>
+          </div>
+          <div class="card">
+            <div class="ct">Wipe tower</div>
+            <div class="fields">
+              <label>X <input id="wx" type="number" inputmode="decimal" /></label
+              ><label>Y <input id="wy" type="number" inputmode="decimal" /></label>
+            </div>
+            <small class="mut">You can also drag the tower in the 3D view.</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div id="modal" hidden>
+      <div class="mbox glass">
+        <div class="mhead">
+          <b id="mtitle"></b><button class="ibtn" id="mclose"><span class="ic" data-i="x"></span></button>
+        </div>
+        <div id="mbody"></div>
+      </div>
+    </div>
+    <div id="prevbar" class="glass" hidden>
+      <div class="pv1">
+        <b id="pvLayer">Layer</b><span class="grow"></span>
+        <div class="seg mini" id="pvMode">
+          <button data-m="tool" class="on">Filament</button><button data-m="type">Type</button>
+        </div>
+        <button class="ibtn" id="pvClose" title="Close preview"><span class="ic" data-i="x"></span></button>
+      </div>
+      <input id="pvSlider" type="range" min="0" value="0" />
+      <div class="legend" id="pvLegend"></div>
+    </div>
+    <div id="paintbar" class="glass" hidden>
+      <div class="pv1">
+        <b id="pbTitle">Paint</b><span class="grow"></span>
+        <div class="seg mini" id="pbTool">
+          <button data-t="brush" class="on">Brush</button><button data-t="fill">Fill</button>
+        </div>
+        <button class="btn2" id="pbRepl" title="Replace one colour of this object by another">Replace…</button>
+        <button class="ibtn" id="pbClose" title="Done"><span class="ic" data-i="x"></span></button>
+      </div>
+      <div class="pv1">
+        <span class="mut" id="pbLab">Size</span
+        ><input id="pbSize" type="range" min="0.5" max="20" step="0.5" value="4" /><span id="pbVal" class="mut"
+          >4 mm</span
+        >
+      </div>
+      <div class="pbch" id="pbChips"></div>
+      <small class="mut" id="pbHint">One finger paints · two fingers rotate/zoom</small>
+    </div>
+    <div id="busy" hidden></div>
+    <div id="toast" hidden></div>
+    <script type="module" src="app.js"></script>
+    <script>
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    </script>
+  </body>
+</html>

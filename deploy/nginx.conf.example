@@ -1,0 +1,29 @@
+# HTTPS reverse proxy, private networks only. Server-Sent Events need buffering off.
+server {
+    listen 443 ssl;
+    server_name slicer.example.lan;
+    ssl_certificate     /etc/ssl/slicer/fullchain.pem;
+    ssl_certificate_key /etc/ssl/slicer/privkey.pem;
+
+    allow 192.168.0.0/16;
+    allow 10.0.0.0/8;
+    allow 172.16.0.0/12;
+    deny all;
+
+    client_max_body_size 200m;           # model uploads
+
+    location / {
+        proxy_pass http://127.0.0.1:3060;
+        proxy_set_header Host $host;
+        proxy_read_timeout 900s;          # a slice request blocks until the CLI finishes
+    }
+
+    location /api/events {
+        proxy_pass http://127.0.0.1:3060;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+}

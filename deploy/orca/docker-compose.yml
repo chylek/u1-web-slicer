@@ -1,0 +1,15 @@
+# Snapmaker Orca (official Linux AppImage) in a KasmVNC desktop container. The slicer only uses its CLI through
+# `docker exec`; the desktop on :3000 is a bonus for checking a project in the real Orca GUI.
+services:
+  orca-web:
+    build: .
+    image: orca-web:2.4.1
+    container_name: orca-web
+    restart: unless-stopped
+    security_opt: [seccomp=unconfined]
+    shm_size: 1gb
+    environment: [PUID=1000, PGID=1000, TZ=Etc/UTC]
+    ports: ["127.0.0.1:3040:3000"]
+    volumes:
+      - ./orca-config:/config
+      - ${U1WEB_DATA:?set U1WEB_DATA in .env}:/jobs   # must match U1WEB_DATA_IN_CONTAINER

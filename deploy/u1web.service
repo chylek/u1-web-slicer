@@ -1,0 +1,15 @@
+# Copy to /etc/systemd/system/, adjust User and WorkingDirectory, then: systemctl enable --now u1web
+[Unit]
+Description=U1 Web Slicer
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+User=u1web
+WorkingDirectory=/opt/u1-web-slicer
+ExecStart=/usr/bin/python3 server.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+{
+  "name": "u1-web-slicer",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "description": "Front-end lint/format tooling only; the app itself has no build step",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint static",
+    "fmt": "prettier --write static/app.js static/style.css static/index.html static/sw.js",
+    "fmt:check": "prettier --check static/app.js static/style.css static/index.html static/sw.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.6.0"
+  }
+}
