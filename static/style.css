@@ -1437,3 +1437,12 @@ img.cam {
     left: 100%;
   }
 }
+
+/* Send / Print / G-code share one row: equal widths, labels never wrap */
+#result .rt .btn2,
+#result .rt a {
+  flex: 1 1 0;
+  justify-content: center;
+  white-space: nowrap;
+  padding: 0 8px;
+}

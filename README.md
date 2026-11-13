@@ -6,7 +6,7 @@ printer over Moonraker. Every browser tab, phone and AI agent (via MCP) edits th
 
 It is deliberately not a universal slicer: the printer profile, presets and printer integration are U1-only.
 
-![Prepare view on a phone, after slicing a four-colour hen coop](docs/screenshot.png)
+![Prepare view on a phone, after slicing the demo cube](docs/screenshot.png)
 
 ## Features
 
@@ -58,6 +58,9 @@ cp deploy/env.example .env          # then edit paths and the printer address
 docker compose --env-file .env -f deploy/orca/docker-compose.yml up -d   # Orca CLI container
 python3 server.py                   # http://<host>:3060
 ```
+
+To try it, upload [examples/demo-cube.3mf](examples/demo-cube.3mf) from the project menu: a painted cube with a
+Full Spectrum orange side (rebuilt by `tools/make_demo.py`).
 
 Open the page on a phone and use the browser's "Install app" to get it as a full-screen app (needs HTTPS, for
 example behind the reverse proxy in [deploy/nginx.conf.example](deploy/nginx.conf.example)).

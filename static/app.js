@@ -3067,7 +3067,7 @@ async function sendGcode(body) {
   return r;
 }
 function plateResult(R, d, multi) {
-  // one plate: thumb, time, Layers/G-code, Send/Print
+  // one plate: thumb, time and grams; then Send / Print / G-code in one row
   if (!d.ok) {
     R.append(el('div', 'warn', `⚠ Plate ${d.plate}: ${d.error}`));
     return;
@@ -3091,16 +3091,18 @@ function plateResult(R, d, multi) {
     )
   );
   top.append(tg);
+  R.append(top);
   const a = el('a');
   a.href = d.gcode;
   a.innerHTML = `<span class="ic">${icon('dl')}</span>G-code`;
-  top.append(a);
-  R.append(top);
   const pr = el('div', 'rt'),
     send = el('button', 'btn2'),
     go = el('button', 'btn2 go');
-  send.innerHTML = `<span class="ic">${icon('send')}</span>Send to U1`;
-  go.innerHTML = `<span class="ic">${icon('printer')}</span>Print now`;
+  send.innerHTML = `<span class="ic">${icon('send')}</span>Send`;
+  go.innerHTML = `<span class="ic">${icon('printer')}</span>Print`;
+  send.title = 'Upload the G-code to the U1 (start it on the printer)';
+  go.title = 'Upload and start printing now';
+  a.title = 'Download the G-code';
   send.onclick = async () => {
     const name = await askName(d);
     if (!name) return;
@@ -3126,7 +3128,7 @@ function plateResult(R, d, multi) {
     go.disabled = false;
     if (r) toast(r.started ? `Printing ${r.file}` : `Uploaded ${r.file} (queued: ${r.queued})`);
   };
-  pr.append(send, go);
+  pr.append(send, go, a);
   R.append(pr);
 }
 function showResult(d) {
