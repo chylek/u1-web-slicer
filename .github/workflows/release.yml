@@ -1,4 +1,4 @@
-# Push a version tag without a "v" (git tag 0.2.0 && git push origin 0.2.0): runs the checks, publishes
+# Push a version tag without a "v" (git tag 0.1.0 && git push origin 0.1.0): runs the checks, publishes
 # ghcr.io/chylek/u1-web-slicer:<version>, :<version>-orca<orca version> and :latest, and creates a GitHub release.
 name: release
 on:

@@ -2,7 +2,7 @@
 # Update: docker compose pull && docker compose up -d   (your data in ./data survives)
 services:
   u1web:
-    image: ghcr.io/chylek/u1-web-slicer:latest   # or pin a release, e.g. :0.2.0
+    image: ghcr.io/chylek/u1-web-slicer:latest   # or pin a release, e.g. :0.1.0
     container_name: u1web
     restart: unless-stopped
     user: "1000:1000"            # owner of ./data on the host (id -u / id -g)

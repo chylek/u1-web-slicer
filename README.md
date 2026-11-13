@@ -55,7 +55,7 @@ mkdir data && docker compose up -d          # http://<host>:3060
 
 **Updates:** `docker compose pull && docker compose up -d`. Your session, history, presets and models live in
 `./data` and survive updates. Releases are listed on the GitHub releases page; pin a version
-(`image: ghcr.io/chylek/u1-web-slicer:0.2.0`) if you prefer to update deliberately.
+(`image: ghcr.io/chylek/u1-web-slicer:0.1.0`) if you prefer to update deliberately.
 
 To try it, upload [examples/demo-cube.3mf](examples/demo-cube.3mf) from the project menu: a painted cube with a
 Full Spectrum orange side (rebuilt by `tools/make_demo.py`).
@@ -116,12 +116,12 @@ Ask it things like "make the roof red and the walls a 50/50 mix of white and yel
 
 ## Releases
 
-Tags are plain versions without a "v" (`0.2.0`). Pushing one runs the checks, publishes the image to
+Tags are plain versions without a "v" (`0.1.0`). Pushing one runs the checks, publishes the image to
 `ghcr.io/chylek/u1-web-slicer` as `<version>`, `<version>-orca<orca version>` and `latest`, and creates a GitHub
 release with generated notes ([.github/workflows/release.yml](.github/workflows/release.yml)):
 
 ```sh
-git tag 0.2.0 && git push origin 0.2.0
+git tag 0.1.0 && git push origin 0.1.0
 ```
 
 ## Development
