@@ -247,6 +247,16 @@ def add_files(files, name, plate):
 
 
 def do_slice(only=None):
+    if S.slicing:
+        return {"ok": False, "error": "already slicing"}
+    S.set_slicing(True)
+    try:
+        return _do_slice(only)
+    finally:
+        S.set_slicing(False)
+
+
+def _do_slice(only=None):
     """slice every plate that has objects (or just `only`); the result keeps one entry per plate + totals.
     Each plate is its own G-code: send and print them one after another."""
     with S.lock:
@@ -265,6 +275,7 @@ def do_slice(only=None):
             + " — use Drop onto the bed",
         }
     plates = []
+    rev0 = S.rev
     ABORT.clear()
     for i, p in enumerate(todo):
         if ABORT.is_set():
@@ -304,6 +315,8 @@ def do_slice(only=None):
     if warns:
         total["warning"] = " · ".join(warns)
     PROGRESS["stage"] = ""  # idle: the UI ignores an empty stage
+    if S.rev != rev0:
+        total["stale"] = True  # edited while slicing: the fresh result is already old
     S.after_slice(total, None)
     return total
 

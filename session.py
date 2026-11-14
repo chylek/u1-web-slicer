@@ -347,8 +347,19 @@ class Session:
             return None, bool(self.st["overrides"])
         return name, self.st["overrides"] != ref
 
+    slicing = False  # a slice is running (shared by every window via the state push)
+
+    def set_slicing(self, v):
+        self.slicing = v
+        for f in list(self.listeners):
+            try:
+                f(self.state())
+            except Exception:
+                self.listeners.remove(f)
+
     def state(self):
         s = dict(self.st)
+        s["slicing"] = self.slicing
         s["profile"], s["profile_modified"] = self.profile_status()
         s["objects"] = [
             dict(

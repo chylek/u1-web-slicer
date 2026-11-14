@@ -556,6 +556,7 @@ async function apply(st) {
   wipeMeshes.forEach((w, i) => (w.visible = st.wipe.enabled && !PV && objs.some((o) => o.plate === i + 1)));
   if (wipeMeshes.length && !drag?.wipe) showWipe(st.wipe.x, st.wipe.y);
   $('slice').disabled = $('save').disabled = false;
+  setSlicing(!!st.slicing);
   $('undo').disabled = !st.can_undo;
   $('redo').disabled = !st.can_redo;
   globalSettings();
@@ -3224,8 +3225,9 @@ function showResult(d) {
   if (d.stale) {
     const w = el('div', 'stalebar');
     w.append(el('span', '', '⟳ The plate changed since this slice — slice again'));
-    const b = el('button', 'btn2', 'Slice again');
-    b.onclick = () => $('slice').click();
+    const b = el('button', 'btn2', S.slicing ? 'Abort slicing' : 'Slice again');
+    b.id = 'sliceAgain';
+    b.onclick = () => $('slice').click(); // while slicing the main button aborts
     w.append(b);
     R.append(w);
   }
@@ -3267,21 +3269,32 @@ $('modeSeg').onclick = (e) => {
   if (!m || e.target.disabled) return;
   m === 'prev' ? openPreview(S.result) : closePreview();
 };
-$('slice').onclick = async () => {
+let sliceTimer = 0;
+function setSlicing(on) {
   const b = $('slice');
-  if (b.classList.contains('busy')) return fetch('/api/slice_abort', {method: 'POST'}); // second tap = abort
-  closePreview();
-  b.classList.add('busy');
+  S.slicing = on;
+  b.classList.toggle('busy', on);
+  if ($('sliceAgain')) $('sliceAgain').textContent = on ? 'Abort slicing' : 'Slice again';
+  clearInterval(sliceTimer);
+  if (!on) {
+    b.lastChild.textContent = 'Slice';
+    return;
+  }
   b.lastChild.textContent = 'Slicing… tap to abort';
-  const poll = setInterval(async () => {
+  const tick = async () => {
     const p = await (await fetch('/api/slice_progress')).json().catch(() => null);
     if (!p?.stage) return;
     b.lastChild.textContent = `${p.of > 1 ? `Plate ${p.plate}/${p.of} · ` : ''}${p.stage} · ${Math.round(p.elapsed)}s · tap to abort`;
-  }, 800);
+  };
+  tick();
+  sliceTimer = setInterval(tick, 800);
+}
+$('slice').onclick = async () => {
+  if (S.slicing) return fetch('/api/slice_abort', {method: 'POST'}); // second tap = abort
+  closePreview();
+  setSlicing(true); // the server's state push confirms/clears it
   const d = await postJ('/api/slice');
-  clearInterval(poll);
-  b.classList.remove('busy');
-  b.lastChild.textContent = 'Slice';
+  setSlicing(false);
   if (d?.ok) openPreview(d);
   else if ($('sheet').dataset.state === 'peek') $('sheet').dataset.state = 'half';
 };
