@@ -334,8 +334,22 @@ class Session:
             if p.stem[2:] not in cids:
                 p.unlink()
 
+    def profile_status(self):
+        """(name, modified) for the profile dropdown: the applied profile, else the project's own process preset
+        (print_settings_id minus its "@Snapmaker U1 ..." suffix) when that is one of ours. modified = the overrides
+        differ from what applying the profile produced (none, for the project default)"""
+        name = self.st.get("profile") or str(self.cfg.get("print_settings_id") or "").split(" @")[0]
+        ref = (
+            self.st.get("profile_ov", self.st["overrides"]) if self.st.get("profile") else {}
+        )  # no ref (old state) = unmodified
+        user = self._profiles()["global"]
+        if name not in PRESETS and name not in user:
+            return None, bool(self.st["overrides"])
+        return name, self.st["overrides"] != ref
+
     def state(self):
         s = dict(self.st)
+        s["profile"], s["profile_modified"] = self.profile_status()
         s["objects"] = [
             dict(
                 o,
@@ -578,7 +592,7 @@ class Session:
             "global": [{"name": n, "builtin": True, "count": len(v)} for n, v in PRESETS.items()]
             + [{"name": n, "builtin": False, "count": len(v)} for n, v in u["global"].items()],
             "object": [{"name": n, "builtin": False, "count": len(v), "settings": v} for n, v in u["object"].items()],
-            "active": self.st.get("profile"),
+            "active": self.profile_status()[0],
         }
 
     def profile_save(self, kind, name, oid=None, part=None):
@@ -1263,6 +1277,7 @@ class Session:
                         k: v for k, v in vals.items() if k in threemf.SETTINGS and v != str(self.st["settings"].get(k))
                     }
                     self.st["profile"] = name
+                    self.st["profile_ov"] = dict(self.st["overrides"])
                     self._label = f"profile · {name}"
                     msg = f"profile '{name}': {len(self.st['overrides'])} settings differ from the project"
                 else:  # merges into the object's own settings
@@ -1643,8 +1658,7 @@ class Session:
                 msg = f"plate {p} deleted" + (f" with {len(gone)} objects" if gone else "")
             elif k == "set_wipe":
                 self.st["wipe"]["x"], self.st["wipe"]["y"] = float(r["x"]), float(r["y"])
-            elif k == "set_global":  # value None = back to the project value
-                self.st.pop("profile", None)
+            elif k == "set_global":  # value None = back to the project value (the profile stays, shown as modified)
                 for a, v in r["settings"].items():
                     if a not in threemf.SETTINGS:
                         raise KeyError(f"unknown setting '{a}'")

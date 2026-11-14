@@ -236,7 +236,7 @@ def test_profiles(new_session):
     s.op({"op": "apply_profile", "kind": "global", "name": "0.20mm Standard"})
     assert s.st["overrides"].get("layer_height") == "0.2" and s.st["profile"] == "0.20mm Standard"
     s.op({"op": "set_global", "settings": {"wall_loops": "5", "wall_filament": "3"}})
-    assert "profile" not in s.st
+    assert s.profile_status() == ("0.20mm Standard", True)
     s.profile_save("global", "Strong")
     s.op({"op": "apply_profile", "kind": "global", "name": "0.08mm Standard"})
     s.op({"op": "apply_profile", "kind": "global", "name": "Strong"})
@@ -387,3 +387,13 @@ def test_arrange_drops_empty_plates(new_session):
     s.op({"op": "add_plate"})
     s.op({"op": "arrange", "all": True})
     assert s.nplates() == 1
+
+
+def test_profile_default_and_modified(new_session):
+    s = new_session()
+    name, mod = s.profile_status()
+    assert name == "0.10mm Color Mixing" and not mod  # the project's own preset is preselected
+    s.op({"op": "apply_profile", "kind": "global", "name": "0.20mm Standard"})
+    assert s.profile_status() == ("0.20mm Standard", False)
+    s.op({"op": "set_global", "settings": {"layer_height": "0.33"}})
+    assert s.profile_status() == ("0.20mm Standard", True)  # still that profile, flagged modified

@@ -1806,6 +1806,16 @@ function profilesCard() {
     sel.append(g);
   }
   sel.value = PROFS.global.some((p) => p.name === S?.profile) ? S.profile : '';
+  const mod = S?.profile_modified;
+  if (mod) {
+    // the dropdown only lists whole profiles: show the current one as modified instead of silently dropping it
+    const o = sel.selectedOptions[0];
+    if (o && o.value) o.textContent = o.value + ' (modified)';
+    else {
+      sel.options[0].textContent = 'Custom settings (modified)';
+    }
+    sel.classList.add('mod');
+  }
   sel.onchange = async () => {
     const p = PROFS.global.find((q) => q.name === sel.value);
     if (!p) return;

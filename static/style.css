@@ -1450,3 +1450,7 @@ img.cam {
   white-space: nowrap;
   padding: 0 8px;
 }
+
+.profs select.mod {
+  border-color: var(--accent, #ff7a33);
+}
