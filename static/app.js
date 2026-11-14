@@ -2605,15 +2605,12 @@ const TYPECOL = [
   '#666666',
 ];
 let PV = null;
-async function openPreview(job) {
-  toast('Loading preview…');
-  const [meta, buf] = await busy(
-    Promise.all([
-      fetch(`/job/${job}/preview.json`).then((r) => r.json()),
-      fetch(`/job/${job}/preview.bin`).then((r) => r.arrayBuffer()),
-    ])
-  );
-  if (meta.error) return toast(meta.error, true);
+async function pvLoad(job) {
+  const [meta, buf] = await Promise.all([
+    fetch(`/job/${job}/preview.json`).then((r) => r.json()),
+    fetch(`/job/${job}/preview.bin`).then((r) => r.arrayBuffer()),
+  ]);
+  if (meta.error) throw new Error(meta.error);
   const dv = new DataView(buf),
     n = meta.count;
   const pos = new Float32Array(n * 6),
@@ -2648,23 +2645,42 @@ async function openPreview(job) {
     g.setAttribute('position', posA);
     g.setAttribute('color', colA);
   }
-  const all = new T.LineSegments(gAll, new T.LineBasicMaterial({vertexColors: true, color: 0x8a8a8a}));
-  const top = new T.LineSegments(gTop, new T.LineBasicMaterial({vertexColors: true}));
+  const grp = new T.Group();
+  grp.add(
+    new T.LineSegments(gAll, new T.LineBasicMaterial({vertexColors: true, color: 0x8a8a8a})),
+    new T.LineSegments(gTop, new T.LineBasicMaterial({vertexColors: true}))
+  );
+  return {meta, tool, typ, ends, colA, gAll, gTop, grp};
+}
+// r = slice result: every sliced plate is shown at its own place on the bed
+async function openPreview(r) {
+  toast('Loading preview…');
+  const jobs = (r.plates || []).filter((x) => x.ok).map((x) => ({job: x.job, plate: x.plate}));
+  if (!jobs.length) jobs.push({job: r.job, plate: 1});
+  let parts;
+  try {
+    parts = await busy(Promise.all(jobs.map((j) => pvLoad(j.job))));
+  } catch (e) {
+    return toast(e.message, true);
+  }
   closePreview();
-  PV = {meta, tool, typ, ends, colA, gAll, gTop, grp: new T.Group()};
-  const pl = (S.result?.plates || []).find((x) => x.job === job)?.plate || 1;
-  PV.grp.position.copy(plateOffset(pl));
+  parts.forEach((p, i) => {
+    p.plate = jobs[i].plate;
+    p.grp.position.copy(plateOffset(p.plate));
+    scene.add(p.grp);
+  });
+  PV = {parts};
+  const pl = parts.some((p) => p.plate === curPlate) ? curPlate : parts[0].plate;
   if (pl !== curPlate) {
     curPlate = pl;
     view(lastView);
     objList();
   }
-  PV.grp.add(all, top);
-  scene.add(PV.grp);
   for (const o of objs) o.group.visible = false;
   wipeMeshes.forEach((w) => (w.visible = false));
-  $('pvSlider').max = meta.layers.length - 1;
-  $('pvSlider').value = meta.layers.length - 1;
+  const nl = Math.max(...parts.map((p) => p.ends.length));
+  $('pvSlider').max = nl - 1;
+  $('pvSlider').value = nl - 1;
   $('prevbar').hidden = false;
   $('sheet').dataset.state = 'peek';
   placePrevbar();
@@ -2676,18 +2692,20 @@ async function openPreview(job) {
   $('toast').hidden = true;
 }
 function pvColour(mode) {
-  const c = PV.colA.array,
-    col = new T.Color(),
-    cache = {},
-    n = PV.tool.length;
-  for (let i = 0; i < n; i++) {
-    const k = mode === 'tool' ? PV.tool[i] : 100 + PV.typ[i];
-    const v = (cache[k] ??= col.set(mode === 'tool' ? fcol(PV.tool[i] + 1) : TYPECOL[PV.typ[i]] || '#888').clone());
-    c[i * 6] = c[i * 6 + 3] = v.r;
-    c[i * 6 + 1] = c[i * 6 + 4] = v.g;
-    c[i * 6 + 2] = c[i * 6 + 5] = v.b;
+  const col = new T.Color(),
+    cache = {};
+  for (const P of PV.parts) {
+    const c = P.colA.array,
+      n = P.tool.length;
+    for (let i = 0; i < n; i++) {
+      const k = mode === 'tool' ? P.tool[i] : 100 + P.typ[i];
+      const v = (cache[k] ??= col.set(mode === 'tool' ? fcol(P.tool[i] + 1) : TYPECOL[P.typ[i]] || '#888').clone());
+      c[i * 6] = c[i * 6 + 3] = v.r;
+      c[i * 6 + 1] = c[i * 6 + 4] = v.g;
+      c[i * 6 + 2] = c[i * 6 + 5] = v.b;
+    }
+    P.colA.needsUpdate = true;
   }
-  PV.colA.needsUpdate = true;
   for (const b of $('pvMode').children) b.classList.toggle('on', b.dataset.m === mode);
   const leg = $('pvLegend');
   leg.innerHTML = '';
@@ -2698,21 +2716,27 @@ function pvColour(mode) {
       leg.append(s);
     });
   else
-    [...new Set(PV.typ)]
-      .sort((p, q) => p - q)
-      .forEach((t) => {
+    [...new Set(PV.parts.flatMap((P) => [...new Set(P.typ)].map((t) => [t, P.meta.types[t]])).map((x) => x.join('|')))]
+      .map((x) => x.split('|'))
+      .sort((p, q) => p[0] - q[0])
+      .forEach(([t, name]) => {
         const s = el('span');
-        s.innerHTML = `<i style="background:${TYPECOL[t]}"></i>${PV.meta.types[t]}`;
+        s.innerHTML = `<i style="background:${TYPECOL[t]}"></i>${name}`;
         leg.append(s);
       });
 }
 function pvLayer() {
-  const L = +$('pvSlider').value,
-    start = L ? PV.ends[L - 1] : 0,
-    end = PV.ends[L];
-  PV.gAll.setDrawRange(0, start * 2);
-  PV.gTop.setDrawRange(start * 2, (end - start) * 2);
-  $('pvLayer').textContent = `Layer ${L + 1} / ${PV.ends.length} · Z ${PV.meta.layers[L].toFixed(2)} mm`;
+  const L0 = +$('pvSlider').value;
+  for (const P of PV.parts) {
+    const L = Math.min(L0, P.ends.length - 1), // plates can differ in height
+      start = L ? P.ends[L - 1] : 0,
+      end = P.ends[L];
+    P.gAll.setDrawRange(0, start * 2);
+    P.gTop.setDrawRange(start * 2, (end - start) * 2);
+  }
+  const P = PV.parts.find((p) => p.plate === curPlate) || PV.parts[0],
+    L = Math.min(L0, P.ends.length - 1);
+  $('pvLayer').textContent = `Layer ${L + 1} / ${P.ends.length} · Z ${P.meta.layers[L].toFixed(2)} mm`;
 }
 function setMode(m) {
   document.body.classList.toggle('prev', m === 'prev');
@@ -2721,9 +2745,11 @@ function setMode(m) {
 function closePreview() {
   setMode('prep');
   if (!PV) return;
-  scene.remove(PV.grp);
-  PV.gAll.dispose();
-  PV.gTop.dispose();
+  for (const P of PV.parts) {
+    scene.remove(P.grp);
+    P.gAll.dispose();
+    P.gTop.dispose();
+  }
   PV = null;
   for (const o of objs) o.group.visible = true;
   wipeMeshes.forEach((w, i) => (w.visible = S.wipe.enabled && objs.some((o) => o.plate === i + 1)));
@@ -3220,7 +3246,7 @@ $('modeSeg').onclick = (e) => {
   const m = e.target.dataset.mode;
   if (!m || e.target.disabled) return;
   m === 'prev'
-    ? openPreview((S.result.plates?.find((p) => p.plate === curPlate && p.ok) || S.result).job)
+    ? openPreview(S.result)
     : closePreview();
 };
 $('slice').onclick = async () => {
@@ -3238,7 +3264,7 @@ $('slice').onclick = async () => {
   clearInterval(poll);
   b.classList.remove('busy');
   b.lastChild.textContent = 'Slice';
-  if (d?.ok) openPreview(d.job);
+  if (d?.ok) openPreview(d);
   else if ($('sheet').dataset.state === 'peek') $('sheet').dataset.state = 'half';
 };
 $('save').onclick = async () => {
