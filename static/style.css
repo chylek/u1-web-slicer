@@ -230,16 +230,22 @@ button:disabled {
   height: 86vh;
 }
 #grab {
-  height: 22px;
+  height: 44px; /* finger-sized hit area; overlaps the header so the layout keeps its 22px */
+  margin-bottom: -22px;
+  flex-shrink: 0; /* the sheet is a flex column: without this the handle was squeezed to a sliver */
+  position: relative;
+  z-index: 1;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
+  padding-top: 8px;
+  box-sizing: border-box;
   cursor: grab;
   touch-action: none;
 }
 #grab i {
-  width: 42px;
-  height: 5px;
+  width: 56px;
+  height: 6px;
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.22);
 }
