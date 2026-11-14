@@ -3224,19 +3224,18 @@ $('modeSeg').onclick = (e) => {
     : closePreview();
 };
 $('slice').onclick = async () => {
-  closePreview();
   const b = $('slice');
-  b.disabled = true;
+  if (b.classList.contains('busy')) return fetch('/api/slice_abort', {method: 'POST'}); // second tap = abort
+  closePreview();
   b.classList.add('busy');
-  b.lastChild.textContent = 'Slicing…';
+  b.lastChild.textContent = 'Slicing… tap to abort';
   const poll = setInterval(async () => {
     const p = await (await fetch('/api/slice_progress')).json().catch(() => null);
     if (!p?.stage) return;
-    b.lastChild.textContent = `${p.of > 1 ? `Plate ${p.plate}/${p.of} · ` : ''}${p.stage} · ${Math.round(p.elapsed)}s`;
+    b.lastChild.textContent = `${p.of > 1 ? `Plate ${p.plate}/${p.of} · ` : ''}${p.stage} · ${Math.round(p.elapsed)}s · tap to abort`;
   }, 800);
   const d = await postJ('/api/slice');
   clearInterval(poll);
-  b.disabled = false;
   b.classList.remove('busy');
   b.lastChild.textContent = 'Slice';
   if (d?.ok) openPreview(d.job);

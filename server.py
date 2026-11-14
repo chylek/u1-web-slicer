@@ -22,6 +22,8 @@ import session as sessmod
 HERE = config.ROOT
 ART = config.MODELS.resolve()
 JOBS = config.DATA
+ABORT = threading.Event()  # set by /api/slice_abort; the running CLI process is killed
+PROC = []  # the running Orca process (at most one: SLICE lock)
 PROGRESS = {"stage": "", "plate": 0, "of": 0, "t0": 0}  # live slice stage for /api/slice_progress
 STAGES = [
     ("Slicing volumes", "Slicing layers"),
@@ -107,6 +109,9 @@ def slice_plate(p):
         t = time.time()
         PROGRESS["t0"] = t
         po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+        PROC[:] = [po]
+        if ABORT.is_set():
+            po.kill()
         threading.Timer(900, po.kill).start()
         lines = []
         for ln in po.stdout:
@@ -115,8 +120,11 @@ def slice_plate(p):
                 if k in ln:
                     PROGRESS["stage"] = v
         po.wait()
+        PROC.clear()
         pr = subprocess.CompletedProcess(cmd, po.returncode, "".join(lines), "")
     res = {"plate": p, "seconds": round(time.time() - t, 1), "job": job}
+    if ABORT.is_set():
+        return dict(res, ok=False, error="aborted"), g
     rj, g = d / "result.json", d / "plate_1.gcode"
     err = json.loads(rj.read_text()).get("error_string", "") if rj.exists() else ""
     err = "" if err.strip(". ") == "Success" else err
@@ -257,12 +265,19 @@ def do_slice(only=None):
             + " — use Drop onto the bed",
         }
     plates = []
+    ABORT.clear()
     for i, p in enumerate(todo):
+        if ABORT.is_set():
+            break
         PROGRESS.update(stage="Starting", plate=i + 1, of=len(todo), t0=time.time())
         res, g = slice_plate(p)
         if res.get("ok"):
             S.after_slice(res, g, store=False)  # preview data + real wipe tower footprint
         plates.append(res)
+    if ABORT.is_set():
+        PROGRESS["stage"] = ""
+        ABORT.clear()
+        return {"ok": False, "aborted": True, "error": "Slicing aborted"}
     ok = [x for x in plates if x.get("ok")]
     first = ok[0] if ok else plates[0]
     total = {
@@ -511,6 +526,11 @@ class H(BaseHTTPRequestHandler):
                 return self._json(S.redo())
             if u.path == "/api/op":
                 return self._json(S.op(r))
+            if u.path == "/api/slice_abort":
+                ABORT.set()
+                for po in PROC:
+                    po.kill()
+                return self._json({"ok": True})
             if u.path == "/api/slice":
                 return self._json(do_slice(r.get("plate")))
             if u.path == "/api/save":

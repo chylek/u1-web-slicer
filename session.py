@@ -928,6 +928,14 @@ class Session:
     def on_plate(self, p):
         return [o for o in self.st["objects"] if o.get("plate", 1) == p]
 
+    def drop_empty_plates(self):
+        """renumber so plates without objects disappear (the last plate stays even if empty)"""
+        used = sorted({o.get("plate", 1) for o in self.st["objects"]})
+        new = {p: i + 1 for i, p in enumerate(used)}
+        for o in self.st["objects"]:
+            o["plate"] = new[o.get("plate", 1)]
+        self.st["plates"] = max(len(used), 1)
+
     def _pack(self, items):
         """shelf-pack (o, bbox) items (tallest first) into one plate: returns (placed [(o, q, x, y)], W, H, leftover)"""
         b, w = self.st["bed"], self.st["wipe"]
@@ -987,6 +995,7 @@ class Session:
         plate 1 (fewest plates). ponytail: bbox-only, no rotation/nesting"""
         objs = [o for o in self.st["objects"] if not o.get("role")]  # modifier objects stay where the user put them
         if not objs:
+            self.drop_empty_plates()
             return
         b, w = self.st["bed"], self.st["wipe"]
         f = w["fp"]
@@ -996,6 +1005,9 @@ class Session:
         else:
             p = plate or 1
             todo = [o for o in self.on_plate(p) if not o.get("role")]
+            if not todo:  # empty plate: nothing to pack, just tidy up
+                self.drop_empty_plates()
+                return
             spill_to = self.nplates() + 1
         items = sorted(((o, self.bbox(o)) for o in todo), key=lambda t: -(t[1][3] - t[1][2]))
         used = set()
@@ -1013,6 +1025,7 @@ class Session:
             p = (p + 1) if spill_to is None else spill_to
             spill_to = None if spill_to is None else spill_to + 1
         self.st["plates"] = max(used) if all_plates else max(self.nplates(), *used)
+        self.drop_empty_plates()
         self.fix_wipe()
         if commit:
             self._commit()

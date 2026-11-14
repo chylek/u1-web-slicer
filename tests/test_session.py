@@ -375,3 +375,15 @@ def test_modifier_objects_and_replace_colour(new_session):
 
 def test_palette_fixture_matches_expectations():
     assert colormix.best(PALETTE[1], U1)["ext"] == 3 and colormix.best(PALETTE[2], U1)["ext"] == 2
+
+
+def test_arrange_drops_empty_plates(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [20, 20, 20]})
+    s.op({"op": "add_plate"})
+    s.op({"op": "add_plate"})
+    s.op({"op": "arrange", "plate": 2})  # empty plate: used to raise max() TypeError
+    assert s.nplates() == 1
+    s.op({"op": "add_plate"})
+    s.op({"op": "arrange", "all": True})
+    assert s.nplates() == 1
