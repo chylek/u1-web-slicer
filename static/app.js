@@ -1792,28 +1792,38 @@ function profilesCard() {
   const box = $('profs');
   if (!box || !PROFS) return;
   box.innerHTML = '';
-  const row = el('div', 'profs');
-  for (const p of PROFS.global) {
-    const b = el('button', 'prof' + (S?.profile === p.name ? ' on' : ''));
-    b.append(el('span', '', p.name));
-    if (p.builtin) b.append(el('em', '', 'Orca'));
-    else {
-      const x = el('span', 'x', '×');
-      x.title = 'Delete';
-      x.onclick = async (e) => {
-        e.stopPropagation();
-        if (confirm(`Delete profile "${p.name}"?`)) {
-          await postJ('/api/profiles/delete', {kind: 'global', name: p.name});
-          loadProfiles();
-        }
-      };
-      b.append(x);
-    }
-    b.onclick = async () => {
-      const r = await op({op: 'apply_profile', kind: 'global', name: p.name, user: !p.builtin});
-      if (r) toast(r.msg);
+  // dropdown (Orca presets / saved), applied on change; saved ones can be deleted with the × next to it
+  const row = el('div', 'profs'),
+    sel = el('select'),
+    grp = {Orca: [], '★ Saved': []};
+  for (const p of PROFS.global) grp[p.builtin ? 'Orca' : '★ Saved'].push(p);
+  sel.append(new Option('Choose a profile…', ''));
+  for (const [label, list] of Object.entries(grp)) {
+    if (!list.length) continue;
+    const g = document.createElement('optgroup');
+    g.label = label;
+    for (const p of list) g.append(new Option(p.name, p.name));
+    sel.append(g);
+  }
+  sel.value = PROFS.global.some((p) => p.name === S?.profile) ? S.profile : '';
+  sel.onchange = async () => {
+    const p = PROFS.global.find((q) => q.name === sel.value);
+    if (!p) return;
+    const r = await op({op: 'apply_profile', kind: 'global', name: p.name, user: !p.builtin});
+    if (r) toast(r.msg);
+  };
+  row.append(sel);
+  const cur = PROFS.global.find((p) => p.name === sel.value);
+  if (cur && !cur.builtin) {
+    const x = el('button', 'ibtn');
+    x.innerHTML = `<span class="ic">${icon('trash')}</span>`;
+    x.title = 'Delete this saved profile';
+    x.onclick = async () => {
+      if (!confirm(`Delete profile "${cur.name}"?`)) return;
+      await postJ('/api/profiles/delete', {kind: 'global', name: cur.name});
+      loadProfiles();
     };
-    row.append(b);
+    row.append(x);
   }
   const save = el('button', 'btn2 full');
   save.innerHTML = `<span class="ic">${icon('save')}</span>Save current settings as profile…`;

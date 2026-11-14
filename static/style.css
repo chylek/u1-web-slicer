@@ -516,7 +516,7 @@ button:disabled {
 }
 .profs {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   margin: 4px 0 8px;
 }
@@ -698,7 +698,8 @@ button:disabled {
   color: var(--mut);
 }
 .fields input,
-.fields select {
+.fields select,
+.profs select {
   flex: 1;
   min-width: 0;
   height: 40px;
