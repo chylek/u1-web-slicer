@@ -123,9 +123,9 @@ def slice_plate(p):
         PROC.clear()
         pr = subprocess.CompletedProcess(cmd, po.returncode, "".join(lines), "")
     res = {"plate": p, "seconds": round(time.time() - t, 1), "job": job}
+    rj, g = d / "result.json", d / "plate_1.gcode"
     if ABORT.is_set():
         return dict(res, ok=False, error="aborted"), g
-    rj, g = d / "result.json", d / "plate_1.gcode"
     err = json.loads(rj.read_text()).get("error_string", "") if rj.exists() else ""
     err = "" if err.strip(". ") == "Success" else err
     if g.exists() and not err:

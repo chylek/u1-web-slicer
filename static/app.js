@@ -3245,9 +3245,7 @@ function showResult(d) {
 $('modeSeg').onclick = (e) => {
   const m = e.target.dataset.mode;
   if (!m || e.target.disabled) return;
-  m === 'prev'
-    ? openPreview(S.result)
-    : closePreview();
+  m === 'prev' ? openPreview(S.result) : closePreview();
 };
 $('slice').onclick = async () => {
   const b = $('slice');
