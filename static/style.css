@@ -224,21 +224,18 @@ button:disabled {
   height: 46vh;
 }
 #sheet[data-state='peek'] {
-  height: calc(132px + var(--safe));
+  height: calc(148px + var(--safe));
 }
 #sheet[data-state='full'] {
   height: 86vh;
 }
 #grab {
-  height: 44px; /* finger-sized hit area; overlaps the header so the layout keeps its 22px */
-  margin-bottom: -22px;
+  height: 38px; /* finger-sized hit area, in the flow so it never covers the header buttons */
   flex-shrink: 0; /* the sheet is a flex column: without this the handle was squeezed to a sliver */
-  position: relative;
-  z-index: 1;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 8px;
+  padding-top: 10px;
   box-sizing: border-box;
   cursor: grab;
   touch-action: none;
