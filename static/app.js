@@ -74,7 +74,13 @@ let GZ = 'move',
   LAY = false,
   gizmoDown = false,
   pv0 = null,
-  zone = null; // GZ: 'move' | 'rotate' | 'scale'; LAY: next tap on the object picks the face to lay on the bed
+  zone = null,
+  selPart = null; // {id, i}: a volume picked in the object list — the gizmo then moves/rotates/scales only that volume
+const gzPart = () => {
+  const pm = selPart && selected?.id === selPart.id ? selected.parts[selPart.i]?.mesh : null;
+  pm?.parent.updateMatrixWorld(true); // freshly rebuilt object: world matrix not computed yet
+  return pm;
+}; // GZ: 'move' | 'rotate' | 'scale'; LAY: next tap on the object picks the face to lay on the bed
 const pivot = new T.Object3D(); // the gizmo drives this proxy at the object's bbox centre; the delta is applied to the object (rotation about the centre, not the mesh origin)
 // snap zone by the finger's distance from the centre, live while dragging: [upper limit, snap, label, ring radius] in gizmo units (rings: ROT_RINGS in TransformControls.js)
 const SNAP = [
@@ -107,6 +113,12 @@ for (const g of ['gizmo', 'picker', 'helper'])
 tc.addEventListener('dragging-changed', (e) => (ctl.enabled = !e.value));
 let gzM0 = '';
 tc.addEventListener('mouseDown', () => {
+  const pm = gzPart();
+  if (pm) {
+    pm.matrixAutoUpdate = false;
+    pv0 = {pm, cw: pivot.position.clone(), q: pivot.quaternion.clone(), d: new T.Matrix4()};
+    return;
+  }
   const g = selected.group,
     b = bbox(selected);
   gzM0 = JSON.stringify(getM(g));
@@ -121,6 +133,45 @@ tc.addEventListener('mouseDown', () => {
 });
 tc.addEventListener('objectChange', () => {
   if (!pv0 || !selected) return;
+  if (pv0.pm) {
+    // world delta D about the volume centre; the volume mesh sits in the object group: local = G⁻¹·D·G
+    const c = pv0.cw,
+      d = pv0.d,
+      M = (m) => d.premultiply(m);
+    if (tc.mode === 'translate') d.makeTranslation(pivot.position.clone().sub(c));
+    else {
+      d.makeTranslation(-c.x, -c.y, -c.z);
+      if (tc.mode === 'scale') {
+        const sd = pivot.scale
+          .clone()
+          .subScalar(1)
+          .multiplyScalar(SCALE_DAMP)
+          .addScalar(1)
+          .max(new T.Vector3(0.02, 0.02, 0.02));
+        sd.multiplyScalar(100).round().divideScalar(100);
+        M(new T.Matrix4().makeRotationFromQuaternion(pv0.q.clone().invert()));
+        M(new T.Matrix4().makeScale(sd.x, sd.y, sd.z));
+        M(new T.Matrix4().makeRotationFromQuaternion(pv0.q));
+        toast(
+          sd
+            .toArray()
+            .map((v) => Math.round(v * 100))
+            .join(' × ') + ' %'
+        );
+      } else {
+        M(new T.Matrix4().makeRotationFromQuaternion(pivot.quaternion));
+        if (zone)
+          toast(
+            `${Math.round(T.MathUtils.radToDeg(tc.rotationAngle))}° · ${zone[2] === 'free' ? 'free' : zone[2] + ' steps'}`
+          );
+      }
+      M(new T.Matrix4().makeTranslation(c));
+    }
+    const G = selected.group.matrixWorld;
+    pv0.pm.matrix.copy(G).invert().multiply(d).multiply(G);
+    pv0.pm.matrixWorldNeedsUpdate = true;
+    return;
+  }
   const g = selected.group;
   if (tc.mode === 'translate') g.position.copy(pv0.p).add(pivot.position).sub(pv0.cw);
   else if (tc.mode === 'scale') {
@@ -157,6 +208,22 @@ tc.addEventListener('mouseUp', async () => {
   dot.visible = false;
   zone = null;
   const o = selected;
+  if (pv0?.pm) {
+    const {pm, d} = pv0;
+    pv0 = null;
+    pm.matrix.identity();
+    pm.matrixAutoUpdate = true;
+    if (!o || d.equals(new T.Matrix4())) return;
+    const P = o.group.parent.matrixWorld; // the server works in plate coordinates
+    const r = await op({
+      op: 'xform_part',
+      id: o.id,
+      part: selPart.i,
+      d: P.clone().invert().multiply(d).multiply(P).elements,
+    });
+    if (r?.msg) toast(r.msg);
+    return;
+  }
   if (!o || JSON.stringify(getM(o.group)) === gzM0) return;
   const r = await op({op: 'move', id: o.id, m: getM(o.group), plate: o.plate});
   pv0 = null;
@@ -170,7 +237,10 @@ function gizmo() {
     tc.detach();
   } else {
     if (!tc.dragging) {
-      pivot.position.copy(bbox(o).getCenter(new T.Vector3()));
+      const pm = gzPart();
+      pivot.position.copy(
+        pm ? new T.Box3().setFromObject(pm).getCenter(new T.Vector3()) : bbox(o).getCenter(new T.Vector3())
+      );
       pivot.scale.set(1, 1, 1);
       if (GZ === 'scale') pivot.quaternion.copy(o.group.quaternion);
       else pivot.quaternion.identity();
@@ -1058,13 +1128,14 @@ function objRows(L, list) {
       chip(same ? e0 : 0, (k) => op({op: 'set_ext', id: o.id, ext: k}), same ? null : o.parts.map((p) => p.extruder))
     );
     r.onclick = () => {
-      selected = selected === o ? null : o;
+      selected = selected === o && !selPart ? null : o;
+      selPart = null;
       refresh();
     };
     L.append(r);
     if (multi && open.has(o.id))
       o.parts.forEach((p, i) => {
-        const pr = el('div', 'orow part'),
+        const pr = el('div', 'orow part' + (selPart?.id === o.id && selPart.i === i && selected === o ? ' on' : '')),
           nm = el('span', 'n', p.name + (Object.keys(p.cfg || {}).length ? ' •' : ''));
         if (p.type !== 'normal_part') nm.prepend(el('span', 'ptype ' + p.type, PTYPE[p.type]));
         const del = el('button', 'ibtn');
@@ -1090,6 +1161,13 @@ function objRows(L, list) {
             ? []
             : [chip(p.extruder, (k) => op({op: 'set_ext', id: o.id, part: i, ext: k}))])
         );
+        pr.onclick = () => {
+          // pick this volume: the gizmo now moves / rotates / scales only it
+          const on = selPart?.id === o.id && selPart.i === i && selected === o;
+          selected = o;
+          selPart = on ? null : {id: o.id, i};
+          refresh();
+        };
         L.append(pr);
       });
   }
@@ -2946,6 +3024,8 @@ addEventListener('pointerup', async (e) => {
   const h = ray.intersectObjects(meshes())[0];
   if (LAY && selected && h?.object.userData.obj === selected) return layOnFace(selected, h);
   selected = h ? h.object.userData.obj : null;
+  const pi = selected ? selected.parts.findIndex((p) => p.mesh === h.object && p.type !== 'normal_part') : -1;
+  selPart = pi >= 0 ? {id: selected.id, i: pi} : null; // tapping a see-through volume picks it for the gizmo
   if (selected) curPlate = selected.plate;
   refresh();
 });

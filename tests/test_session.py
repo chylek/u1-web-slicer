@@ -352,6 +352,12 @@ def test_modifier_objects_and_replace_colour(new_session):
     assert (
         abs(sum(v[0] for v in g) / len(g) + t[9] - 55) < 0.01 and abs(sum(v[2] for v in g) / len(g) + t[11] - 3) < 0.01
     )
+    # gizmo: rotate 90° about Z and double X, about the world point (55, 45, 3) -> 5x5x5 becomes 5 wide in x, 10 in y
+    s.op({"op": "xform_part", "id": a, "part": r["part"], "d": [0, 2, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 100, -65, 0, 1]})
+    g = s.geos[s.obj(a)["gid"]]["parts"][r["part"]]["verts"]
+    xs, ys = [v[0] + t[9] for v in g], [v[1] + t[10] for v in g]
+    assert abs(max(xs) - min(xs) - 5) < 0.01 and abs(max(ys) - min(ys) - 10) < 0.01
+    assert abs(sum(xs) / len(xs) - 55) < 0.01 and abs(sum(ys) / len(ys) - 45) < 0.01
     s.op({"op": "add_primitive", "shape": "box", "size": [8, 8, 8], "x": 50, "y": 50})
     m = s.st["objects"][1]["id"]
     s.op({"op": "set_object", "id": m, "x": 50, "y": 50})

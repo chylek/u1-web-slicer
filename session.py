@@ -1186,6 +1186,7 @@ class Session:
         "del_part": "remove volume",
         "set_part": "part settings",
         "move_part": "move volume",
+        "xform_part": "transform volume",
         "set_role": "object role",
         "set_filaments": "filament colours",
         "set_filament_preset": "filament preset",
@@ -1529,6 +1530,22 @@ class Session:
                 o["pv"] = o.get("pv", 0) + 1
                 self._commit(True)
                 return {"ok": True, "rev": self.rev, "gid": o["gid"], "msg": f"{p['name']} moved"}
+            elif k == "xform_part":  # {id, part, d: 4x4 column-major} gizmo move/rotate/scale of a volume, plate coords
+                o = self.obj(r["id"])
+                i = self.part_index(o, r["part"])
+                d = [float(v) for v in r["d"]]
+                g = self.own_geo(o, new_shape=True)
+                p = g["parts"][i]
+                m = o["m"]
+                W = []
+                for x, y, z in p["verts"]:
+                    w = [x * m[j] + y * m[3 + j] + z * m[6 + j] + m[9 + j] for j in range(3)]
+                    W.append(tuple(d[j] * w[0] + d[4 + j] * w[1] + d[8 + j] * w[2] + d[12 + j] for j in range(3)))
+                p["verts"] = self.to_local(o, W)
+                self._vcache.pop(o["gid"], None)
+                o["pv"] = o.get("pv", 0) + 1
+                self._commit(True)
+                return {"ok": True, "rev": self.rev, "gid": o["gid"], "msg": f"{p['name']} transformed"}
             elif (
                 k == "set_role"
             ):  # the whole object acts as a modifier/negative/blocker/enforcer for objects it overlaps (null = normal)
