@@ -170,6 +170,22 @@ def slot_values(cfg, i):
     return out
 
 
+def grow_cfg(cfg, m):
+    """cfg with filament slots padded to m by cloning the last slot (per-filament lists, interleaved flow keys)"""
+    n = len(cfg["filament_type"])
+    step = [int(x) for x in cfg.get("filament_flow_step_size") or ["1"] * n]
+    cfg = dict(cfg)
+    for k, v in cfg.items():
+        if not isinstance(v, list):
+            continue
+        if k in FLOW_KEYS and len(v) == sum(step):
+            cfg[k] = v + v[sum(step[:-1]) :] * (m - n)
+        elif len(v) == n:
+            cfg[k] = v + v[-1:] * (m - n)
+    cfg["filament_flow_step_size"] = [str(x) for x in step + step[-1:] * (m - n)]
+    return cfg
+
+
 def match_preset(type_, vendor="", sub=""):
     """best U1 preset for what the printer reports (type PLA/TPU..., vendor, sub_type) or None"""
     c = [
@@ -1311,8 +1327,14 @@ class Session:
             ):  # recolour the scene onto a palette: {filaments: [{colour, type}], map: {old_id: option}}
                 n = len(self.st["filaments"])
                 fs = r["filaments"]
-                if len(fs) != n:
+                if len(fs) < n:
                     raise ValueError(f"project has {n} filaments, got {len(fs)}")
+                if len(fs) > n:  # e.g. a 2-colour project mapped onto the printer's 4 slots: add slots first
+                    if self.mixes():  # mix ids sit after the physical ids and would shift
+                        raise ValueError(f"project has {n} filaments and mixes, got {len(fs)}")
+                    self.cfg = grow_cfg(self.cfg, len(fs))
+                    self.st["filaments"] += [dict(self.st["filaments"][-1]) for _ in range(len(fs) - n)]
+                    n = len(fs)
                 rows, new = [], {}
                 for old, opt in r["map"].items():
                     new[int(old)] = int(opt["ext"]) if opt["kind"] == "phys" else self._mix_id(rows, opt_recipe(opt))

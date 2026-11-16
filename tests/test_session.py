@@ -397,3 +397,13 @@ def test_profile_default_and_modified(new_session):
     assert s.profile_status() == ("0.20mm Standard", False)
     s.op({"op": "set_global", "settings": {"layer_height": "0.33"}})
     assert s.profile_status() == ("0.20mm Standard", True)  # still that profile, flagged modified
+
+
+def test_grow_cfg_pads_slots(new_session):
+    from session import grow_cfg
+
+    c = new_session().cfg
+    n = len(c["filament_type"])
+    g = grow_cfg(c, n + 2)
+    assert len(g["filament_type"]) == n + 2 and len(g["filament_colour"]) == n + 2
+    assert sum(int(x) for x in g["filament_flow_step_size"]) == len(g["filament_max_volumetric_speed"])
