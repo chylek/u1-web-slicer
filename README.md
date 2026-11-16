@@ -129,6 +129,7 @@ git tag 0.1.0 && git push origin 0.1.0
 ```sh
 uv run --with pillow --with pytest pytest     # tests (no Orca needed)
 uvx ruff format . && uvx ruff check .         # Python format + lint
+git config core.hooksPath .githooks             # pre-commit: the same format/lint checks as CI
 npm install && npm run fmt && npm run lint    # front-end format + lint (prettier, eslint)
 python3 threemf.py some.3mf                   # most modules have a self-check: python3 <module>.py
 ```

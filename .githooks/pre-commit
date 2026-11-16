@@ -1,0 +1,3 @@
+#!/bin/sh
+# same checks as CI; enable once per clone: git config core.hooksPath .githooks
+uvx ruff format --check . && uvx ruff check . && npm run -s fmt:check && npm run -s lint
