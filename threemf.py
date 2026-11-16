@@ -362,6 +362,11 @@ def fit_flush(cfg):
     """Purge-volume tables sized to the filament count (m*m matrix, 2 per filament). A table left short by an
     earlier slot growth makes Orca read past it and segfault once a high slot is used with another one."""
     cfg, m = dict(cfg), len(cfg["filament_colour"])
+    # keys an older project lacks (e.g. filament_adhesiveness_category) come from the base profile: without them
+    # Orca's wipe tower drops every tool change ("no wipe tower block for adhesiveness category") and paint is ignored
+    for k, v in json.loads(BASE).items():
+        if k not in cfg:
+            cfg[k] = v[:m] + v[-1:] * (m - len(v)) if isinstance(v, list) and len(v) == 4 else v
     fm = cfg.get("flush_volumes_matrix")
     if fm and len(fm) != m * m:
         n = round(len(fm) ** 0.5)

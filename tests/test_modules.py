@@ -46,3 +46,13 @@ def test_printer_eta_blend():
         [sys.executable, "printer.py"], cwd=ROOT, capture_output=True, text=True, env=env, timeout=60, check=False
     )
     assert "eta ok" in out.stdout or "U1_HOST is not set" in out.stderr  # the blend asserts run before the live call
+
+
+def test_fit_flush_fills_missing_base_keys():
+    import json
+
+    import threemf
+
+    cfg = json.loads(threemf.BASE)
+    del cfg["filament_adhesiveness_category"]
+    assert threemf.fit_flush(cfg)["filament_adhesiveness_category"] == ["100"] * len(cfg["filament_colour"])
