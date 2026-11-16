@@ -407,3 +407,12 @@ def test_grow_cfg_pads_slots(new_session):
     g = grow_cfg(c, n + 2)
     assert len(g["filament_type"]) == n + 2 and len(g["filament_colour"]) == n + 2
     assert sum(int(x) for x in g["filament_flow_step_size"]) == len(g["filament_max_volumetric_speed"])
+
+
+def test_build_fits_flush_matrix():
+    import threemf
+
+    c = {"filament_colour": list("abcd"), "flush_volumes_matrix": ["0", "265", "690", "0"], "flush_volumes_vector": ["140"] * 4}
+    f = threemf.fit_flush(c)
+    assert len(f["flush_volumes_matrix"]) == 16 and f["flush_volumes_matrix"][1] == "265" and f["flush_volumes_matrix"][5] == "0"
+    assert len(f["flush_volumes_vector"]) == 8

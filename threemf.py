@@ -358,11 +358,31 @@ def centred(geo):
     return geo
 
 
+def fit_flush(cfg):
+    """Purge-volume tables sized to the filament count (m*m matrix, 2 per filament). A table left short by an
+    earlier slot growth makes Orca read past it and segfault once a high slot is used with another one."""
+    cfg, m = dict(cfg), len(cfg["filament_colour"])
+    fm = cfg.get("flush_volumes_matrix")
+    if fm and len(fm) != m * m:
+        n = round(len(fm) ** 0.5)
+        if n * n == len(fm):
+            off = [float(x) for i, x in enumerate(fm) if i % (n + 1)]
+            avg = str(round(sum(off) / len(off))) if off else "0"
+            cfg["flush_volumes_matrix"] = [
+                fm[i * n + j] if i < n and j < n else "0" if i == j else avg for i in range(m) for j in range(m)
+            ]
+    fv = cfg.get("flush_volumes_vector")
+    if fv and len(fv) != 2 * m and len(fv) % 2 == 0:
+        fv = fv[: 2 * m] + fv[-2:] * (m - len(fv) // 2)
+        cfg["flush_volumes_vector"] = fv
+    return cfg
+
+
 def build(cfg, geos, objects, wipe=None, mix=None, settings=None, plates=None):
     """objects: [{gid, name, m, ext:[per part], plate?}] -> 3MF bytes (template cfg = project settings dict).
     plates = number of plates for a multi-plate project file (objects in plate-local coords are offset into Orca's plate
     grid and listed in <plate> blocks); None = one plate (what we slice)."""
-    cfg = dict(cfg)
+    cfg = fit_flush(cfg)
     for k, v in (settings or {}).items():
         if k in SETTINGS and k in cfg:
             cfg[k] = [str(v)] * len(cfg[k]) if isinstance(cfg[k], list) else str(v)
