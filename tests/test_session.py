@@ -430,3 +430,16 @@ def test_build_fits_flush_matrix():
         and f["flush_volumes_matrix"][5] == "0"
     )
     assert len(f["flush_volumes_vector"]) == 8
+
+
+def test_geo_resends_only_changed_meshes(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [20, 20, 20]})
+    a = s.st["objects"][0]["id"]
+    r = s.op({"op": "add_part", "id": a, "kind": "modifier", "shape": "box", "size": [5, 5, 5]})
+    g1 = s.geo(s.obj(a)["gid"])
+    have = {p["key"] for p in g1["parts"]}
+    s.op({"op": "xform_part", "id": a, "part": r["part"], "d": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 3, 0, 0, 1]})
+    g2 = s.geo(s.obj(a)["gid"], have)
+    assert "pos" not in g2["parts"][0] and g2["parts"][0]["key"] == g1["parts"][0]["key"]  # the solid is not resent
+    assert "pos" in g2["parts"][1] and g2["parts"][1]["key"] not in have  # the moved modifier is

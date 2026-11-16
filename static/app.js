@@ -505,16 +505,21 @@ const bbox = (o) => {
 };
 
 // ---------- server state -> scene (the server is the single source of truth; this page only renders it and sends ops)
-const geoCache = {};
+const geoCache = {},
+  meshCache = new Map(); // part mesh key -> BufferGeometry: an unchanged part is never downloaded twice
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 function geoFor(gid) {
-  return (geoCache[gid] ??= fetch('/api/geo/' + gid)
+  return (geoCache[gid] ??= fetch(`/api/geo/${gid}?have=${[...meshCache.keys()].join(',')}`)
     .then((r) => r.json())
     .then((g) =>
       g.parts.map((p) => {
-        const geo = new T.BufferGeometry();
-        geo.setAttribute('position', new T.BufferAttribute(new Float32Array(b64(p.pos).buffer), 3));
-        geo.computeVertexNormals();
+        let geo = meshCache.get(p.key);
+        if (!geo) {
+          geo = new T.BufferGeometry();
+          geo.setAttribute('position', new T.BufferAttribute(new Float32Array(b64(p.pos).buffer), 3));
+          geo.computeVertexNormals();
+          meshCache.set(p.key, geo);
+        }
         return {geo, paint: p.paint, type: p.type || 'normal_part'};
       })
     )

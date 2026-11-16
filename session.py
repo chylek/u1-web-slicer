@@ -393,21 +393,29 @@ class Session:
         s["can_redo"] = bool(self.db.execute("select 1 from hist where id > ?", (cur,)).fetchone())
         return s
 
-    def geo(self, gid):
+    @staticmethod
+    def _mesh_key(p):
+        """id of a part's mesh for browser caching: mesh edits always assign new verts/tris lists (never mutate),
+        so the key lives as long as both lists are the same objects; copies made by own_geo share it"""
+        import uuid
+
+        k = p.get("_k")
+        if not k or k[0] is not p["verts"] or k[1] is not p["tris"]:
+            k = p["_k"] = (p["verts"], p["tris"], uuid.uuid4().hex[:12])
+        return k[2]
+
+    def geo(self, gid, have=()):
+        """have = mesh keys the browser already holds: those parts come without "pos" (moving a modifier inside a
+        1.8M-triangle model must not resend the 88 MB model)"""
         g = self.geos[gid]
-        return {
-            "gid": gid,
-            "shape": g.get("shape"),
-            "parts": [
-                {
-                    "name": p["name"],
-                    "type": p.get("type", "normal_part"),
-                    "pos": threemf.pos_b64(p["verts"], p["tris"]),
-                    "paint": self._paint_b64(p),
-                }
-                for p in g["parts"]
-            ],
-        }
+        out = []
+        for p in g["parts"]:
+            k = self._mesh_key(p)
+            d = {"name": p["name"], "type": p.get("type", "normal_part"), "key": k, "paint": self._paint_b64(p)}
+            if k not in have:
+                d["pos"] = threemf.pos_b64(p["verts"], p["tris"])
+            out.append(d)
+        return {"gid": gid, "shape": g.get("shape"), "parts": out}
 
     def _tree_paint(self, o, parts, classify, st, detail, normal_ok=None):
         """apply an adaptive (Orca TriangleSelector-style) paint to parts of o; classify works in object-local "

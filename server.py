@@ -413,7 +413,8 @@ class H(BaseHTTPRequestHandler):
                 with S.lock:
                     return self._json(S.history(int(q.get("n", ["30"])[0])))
             if u.path.startswith("/api/geo/"):
-                return self._json(S.geo(u.path.rsplit("/", 1)[1]))
+                have = set(filter(None, q.get("have", [""])[0].split(",")))
+                return self._json(S.geo(u.path.rsplit("/", 1)[1], have))
             if u.path == "/api/events":
                 return self._events()
             if u.path == "/api/files":
