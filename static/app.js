@@ -57,7 +57,8 @@ const scene = new T.Scene();
 scene.background = new T.Color(0x141619);
 scene.fog = new T.Fog(0x141619, 700, 1400); // pushed out in view() when several plates are visible
 let bedPlates = [],
-  overhangs = false; // used by the render loop, which starts right away
+  overhangs = false, // used by the render loop, which starts right away
+  PV = null; // layer preview (ditto)
 const persp = new T.PerspectiveCamera(38, 1, 1, 3000);
 persp.up.set(0, 0, 1);
 const ortho = new T.OrthographicCamera(-1, 1, 1, -1, -3000, 6000);
@@ -313,7 +314,10 @@ resize();
     if (bp.material.transparent !== see)
       Object.assign(bp.material, {transparent: see, opacity: see ? 0.25 : 1, needsUpdate: true});
   }
-  renderer.render(scene, cam);
+  // the layer preview can be millions of beads: redraw it only when the view, layer or colours change (phone battery)
+  const key = PV && cam.matrixWorld.elements.join() + cam.projectionMatrix.elements.join();
+  if (!PV || PV.dirty || key !== PV.key) renderer.render(scene, cam);
+  if (PV) Object.assign(PV, {dirty: false, key});
   requestAnimationFrame(loop);
 })();
 
@@ -2708,7 +2712,72 @@ const TYPECOL = [
   '#ff99c8',
   '#666666',
 ];
-let PV = null;
+const BEAD = (() => {
+  const c = [],
+    n = [],
+    i = [];
+  for (const [nx, nz, q] of [
+    [
+      0,
+      1,
+      [
+        [0, -1, 1],
+        [1, -1, 1],
+        [0, 1, 1],
+        [1, 1, 1],
+      ],
+    ], // top
+    [
+      1,
+      0,
+      [
+        [0, 1, 0],
+        [1, 1, 0],
+        [0, 1, 1],
+        [1, 1, 1],
+      ],
+    ], // left side
+    [
+      -1,
+      0,
+      [
+        [0, -1, 0],
+        [1, -1, 0],
+        [0, -1, 1],
+        [1, -1, 1],
+      ],
+    ], // right side
+  ]) {
+    const k = c.length / 3;
+    for (const v of q) (c.push(...v), n.push(nx, nz));
+    i.push(k, k + 1, k + 2, k + 2, k + 1, k + 3);
+  }
+  return {
+    c,
+    n,
+    i,
+    vs: `attribute vec3 a; attribute vec3 b; attribute vec3 col; attribute vec2 nrm;
+uniform float w; uniform float h; uniform int topStart;
+varying vec3 vC; varying vec3 vN;
+void main() {
+  vec2 d = b.xy - a.xy; float L = length(d);
+  vec2 dir = L > 1e-6 ? d / L : vec2(1.0, 0.0);
+  vec3 side = vec3(-dir.y, dir.x, 0.0);
+  vec3 p = mix(a, b, position.x) + vec3(dir * (position.x * 2.0 - 1.0) * w * 0.5, 0.0)
+    + side * position.y * w * 0.5 + vec3(0.0, 0.0, (position.z - 1.0) * h);
+  vN = normalize(normalMatrix * (side * nrm.x + vec3(0.0, 0.0, nrm.y)));
+  vC = gl_InstanceID < topStart ? col * 0.6 : col; // layers below the current one dimmed
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}`,
+    fs: `varying vec3 vC; varying vec3 vN;
+void main() {
+  vec3 n = normalize(vN);
+  float l = 0.35 + 0.5 * abs(dot(n, normalize(vec3(0.3, 0.6, 1.0)))) + 0.15 * abs(dot(n, normalize(vec3(-0.6, -0.2, 0.4))));
+  gl_FragColor = vec4(vC * l, 1.0);
+  #include <colorspace_fragment>
+}`,
+  };
+})();
 async function pvLoad(job) {
   const [meta, buf] = await Promise.all([
     fetch(`/job/${job}/preview.json`).then((r) => r.json()),
@@ -2741,20 +2810,38 @@ async function pvLoad(job) {
     ends[L] = i + 1;
   }
   for (let L = 1; L < ends.length; L++) ends[L] = Math.max(ends[L], ends[L - 1]);
-  const posA = new T.BufferAttribute(pos, 3),
-    colA = new T.BufferAttribute(new Float32Array(n * 6), 3);
-  const gAll = new T.BufferGeometry(),
-    gTop = new T.BufferGeometry();
-  for (const g of [gAll, gTop]) {
-    g.setAttribute('position', posA);
-    g.setAttribute('color', colA);
-  }
+  // every segment is drawn as a lit bead (top + two sides, line width × layer height) built on the GPU from one
+  // instanced 12-vertex template; bare lines made the printed shape hard to read
+  const geo = new T.InstancedBufferGeometry(),
+    ib = new T.InstancedInterleavedBuffer(pos, 6),
+    colA = new T.InstancedBufferAttribute(new Uint8Array(n * 3), 3, true);
+  geo.setAttribute('position', new T.Float32BufferAttribute(BEAD.c, 3)); // (along 0..1, side ±1, up 0..1)
+  geo.setAttribute('nrm', new T.Float32BufferAttribute(BEAD.n, 2)); // normal as (side, up)
+  geo.setIndex(BEAD.i);
+  geo.setAttribute('a', new T.InterleavedBufferAttribute(ib, 3, 0));
+  geo.setAttribute('b', new T.InterleavedBufferAttribute(ib, 3, 3));
+  geo.setAttribute('col', colA);
+  geo.instanceCount = n;
+  const zs = meta.layers,
+    dz = zs
+      .slice(1)
+      .map((z, i) => z - zs[i])
+      .sort((p, q) => p - q),
+    mat = new T.ShaderMaterial({
+      uniforms: {
+        w: {value: 0.42}, // ponytail: fixed bead width/height (median layer step); per-segment widths if it ever matters
+        h: {value: dz.length ? dz[dz.length >> 1] : 0.2},
+        topStart: {value: 0},
+      },
+      vertexShader: BEAD.vs,
+      fragmentShader: BEAD.fs,
+      side: T.DoubleSide,
+    }),
+    mesh = new T.Mesh(geo, mat);
+  mesh.frustumCulled = false;
   const grp = new T.Group();
-  grp.add(
-    new T.LineSegments(gAll, new T.LineBasicMaterial({vertexColors: true, color: 0x8a8a8a})),
-    new T.LineSegments(gTop, new T.LineBasicMaterial({vertexColors: true}))
-  );
-  return {meta, tool, typ, ends, colA, gAll, gTop, grp};
+  grp.add(mesh);
+  return {meta, tool, typ, ends, colA, geo, mat, grp};
 }
 // r = slice result: every sliced plate is shown at its own place on the bed
 async function openPreview(r) {
@@ -2804,12 +2891,13 @@ function pvColour(mode) {
     for (let i = 0; i < n; i++) {
       const k = mode === 'tool' ? P.tool[i] : 100 + P.typ[i];
       const v = (cache[k] ??= col.set(mode === 'tool' ? fcol(P.tool[i] + 1) : TYPECOL[P.typ[i]] || '#888').clone());
-      c[i * 6] = c[i * 6 + 3] = v.r;
-      c[i * 6 + 1] = c[i * 6 + 4] = v.g;
-      c[i * 6 + 2] = c[i * 6 + 5] = v.b;
+      c[i * 3] = v.r * 255;
+      c[i * 3 + 1] = v.g * 255;
+      c[i * 3 + 2] = v.b * 255;
     }
     P.colA.needsUpdate = true;
   }
+  PV.dirty = true;
   for (const b of $('pvMode').children) b.classList.toggle('on', b.dataset.m === mode);
   const leg = $('pvLegend');
   leg.innerHTML = '';
@@ -2835,9 +2923,10 @@ function pvLayer() {
     const L = Math.min(L0, P.ends.length - 1), // plates can differ in height
       start = L ? P.ends[L - 1] : 0,
       end = P.ends[L];
-    P.gAll.setDrawRange(0, start * 2);
-    P.gTop.setDrawRange(start * 2, (end - start) * 2);
+    P.geo.instanceCount = end;
+    P.mat.uniforms.topStart.value = start;
   }
+  PV.dirty = true;
   const P = PV.parts.find((p) => p.plate === curPlate) || PV.parts[0],
     L = Math.min(L0, P.ends.length - 1);
   $('pvLayer').textContent = `Layer ${L + 1} / ${P.ends.length} · Z ${P.meta.layers[L].toFixed(2)} mm`;
@@ -2851,8 +2940,8 @@ function closePreview() {
   if (!PV) return;
   for (const P of PV.parts) {
     scene.remove(P.grp);
-    P.gAll.dispose();
-    P.gTop.dispose();
+    P.geo.dispose();
+    P.mat.dispose();
   }
   PV = null;
   for (const o of objs) o.group.visible = true;
