@@ -2758,21 +2758,26 @@ const BEAD = (() => {
     i,
     vs: `attribute vec3 a; attribute vec3 b; attribute vec3 col; attribute vec2 nrm;
 uniform float w; uniform float h; uniform int topStart;
-varying vec3 vC; varying vec3 vN;
+varying vec3 vC; varying vec3 vSide; varying vec3 vUp; varying vec2 vQ;
 void main() {
   vec2 d = b.xy - a.xy; float L = length(d);
   vec2 dir = L > 1e-6 ? d / L : vec2(1.0, 0.0);
   vec3 side = vec3(-dir.y, dir.x, 0.0);
   vec3 p = mix(a, b, position.x) + vec3(dir * (position.x * 2.0 - 1.0) * w * 0.5, 0.0)
     + side * position.y * w * 0.5 + vec3(0.0, 0.0, (position.z - 1.0) * h);
-  vN = normalize(normalMatrix * (side * nrm.x + vec3(0.0, 0.0, nrm.y)));
+  // rounded bead: across the top the normal sweeps side to side (vQ.x -1..1), down the sides it sweeps up/down
+  // (vQ.y), so each line gets a highlight in its middle and dark edges: neighbouring lines and layers stay apart
+  vSide = normalMatrix * side; vUp = normalMatrix * vec3(0.0, 0.0, 1.0);
+  vQ = nrm.y > 0.5 ? vec2(position.y, 2.0) : vec2(nrm.x, position.z * 2.0 - 1.0); // y = 2: top face
   vC = gl_InstanceID < topStart ? col * 0.6 : col; // layers below the current one dimmed
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`,
-    fs: `varying vec3 vC; varying vec3 vN;
+    fs: `varying vec3 vC; varying vec3 vSide; varying vec3 vUp; varying vec2 vQ;
 void main() {
-  vec3 n = normalize(vN);
-  float l = 0.35 + 0.5 * abs(dot(n, normalize(vec3(0.3, 0.6, 1.0)))) + 0.15 * abs(dot(n, normalize(vec3(-0.6, -0.2, 0.4))));
+  float s = clamp(vQ.x, -1.0, 1.0), u = clamp(vQ.y, -1.0, 1.0);
+  vec2 q = vQ.y > 1.5 ? vec2(s, sqrt(1.0 - s * s)) : vec2(sign(vQ.x) * sqrt(1.0 - u * u), u);
+  vec3 n = normalize(normalize(vSide) * q.x + normalize(vUp) * q.y);
+  float l = 0.2 + 0.7 * pow(abs(dot(n, normalize(vec3(0.25, 0.45, 1.0)))), 1.5) + 0.12 * abs(dot(n, normalize(vec3(-0.6, -0.2, 0.4))));
   gl_FragColor = vec4(vC * l, 1.0);
   #include <colorspace_fragment>
 }`,
