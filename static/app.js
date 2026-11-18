@@ -918,9 +918,9 @@ function recolour() {
         p.mesh.renderOrder = 2;
         continue;
       }
-      const seeThrough = selected === o && selPart?.id === o.id; // volume picked in the list: show the volumes inside (a model's own magnet/keychain holes no longer ghost the whole body)
+      const picked = selected === o && selPart?.id === o.id ? o.parts[selPart.i] : null; // volume picked in the list
       const dim = selected && selected !== o; // unselected objects fade out
-      const op_ = dim ? 0.22 : seeThrough ? 0.3 : 1;
+      const op_ = dim ? 0.22 : picked && p !== picked ? 0.3 : 1; // the picked volume stands out inside the ghosted rest
       if (p.type === 'normal_part' && p.mesh.material.opacity !== op_)
         Object.assign(p.mesh.material, {transparent: op_ < 1, opacity: op_, depthWrite: op_ === 1, needsUpdate: true});
       if (p.overlay && p.overlay.material.opacity !== op_)
@@ -939,7 +939,7 @@ function recolour() {
             support_enforcer: '#4cd964',
           }[p.type] || '#ffd166';
         p.mesh.material.color.set(tc);
-        p.mesh.material.opacity = dim ? 0.12 : 0.38;
+        p.mesh.material.opacity = dim ? 0.12 : picked ? (p === picked ? 0.95 : 0.2) : 0.38;
         continue;
       }
       if (overhangs) {
