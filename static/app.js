@@ -918,7 +918,7 @@ function recolour() {
         p.mesh.renderOrder = 2;
         continue;
       }
-      const seeThrough = selected === o && o.parts.some((x) => x.type !== 'normal_part'); // show the volumes inside the selected object
+      const seeThrough = selected === o && selPart?.id === o.id; // volume picked in the list: show the volumes inside (a model's own magnet/keychain holes no longer ghost the whole body)
       const dim = selected && selected !== o; // unselected objects fade out
       const op_ = dim ? 0.22 : seeThrough ? 0.3 : 1;
       if (p.type === 'normal_part' && p.mesh.material.opacity !== op_)
