@@ -1237,6 +1237,7 @@ class Session:
         "mix_del": "remove mix",
         "add_primitive": "add primitive",
         "add_part": "add volume",
+        "merge_object": "merge objects",
         "del_part": "remove volume",
         "set_part": "part settings",
         "move_part": "move volume",
@@ -1743,6 +1744,34 @@ class Session:
             elif k == "del":
                 o = self.obj(r["id"])
                 self.st["objects"].remove(o)
+            elif (
+                k == "merge_object"
+            ):  # {id: target, src}: the src object's solid parts (paint kept) become parts of target
+                o, so = self.obj(r["id"]), self.obj(r["src"])
+                if o is so:
+                    raise ValueError("cannot merge an object into itself")
+                sg = self.geos[so["gid"]]
+                new = []
+                for i, p in enumerate(sg["parts"]):
+                    if p.get("type", "normal_part") != "normal_part":
+                        continue
+                    W = [
+                        tuple(
+                            v[0] * so["m"][j] + v[1] * so["m"][3 + j] + v[2] * so["m"][6 + j] + so["m"][9 + j]
+                            for j in range(3)
+                        )
+                        for v in p["verts"]
+                    ]
+                    new.append((dict(p, verts=self.to_local(o, W)), so["ext"][i] if i < len(so["ext"]) else 1))
+                pc = self.pcfg(o)
+                g = self.own_geo(o, new_shape=True)
+                for p, e in new:
+                    g["parts"].append(p)
+                    o["ext"].append(int(e))
+                    pc.append({})
+                o["pcfg"] = pc
+                self.st["objects"].remove(so)
+                msg = f"{so['name']} merged into {o['name']} ({len(new)} parts)"
             elif k == "arrange":  # {plate?} one plate (spills to new plates) | {all: true} repack everything
                 self.arrange(commit=False, plate=int(r.get("plate") or 1), all_plates=bool(r.get("all")))
                 msg = f"arranged on {self.nplates()} plate(s)"
