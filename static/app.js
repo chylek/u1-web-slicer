@@ -1909,8 +1909,49 @@ function profilesCard() {
   sel.onchange = async () => {
     const p = PROFS.global.find((q) => q.name === sel.value);
     if (!p) return;
-    const r = await op({op: 'apply_profile', kind: 'global', name: p.name, user: !p.builtin});
-    if (r) toast(r.msg);
+    const mine = Object.entries(S?.my_changes || {});
+    if (!mine.length) {
+      const r = await op({op: 'apply_profile', kind: 'global', name: p.name, user: !p.builtin});
+      if (r) toast(r.msg);
+      return;
+    }
+    // your own changes ride on top of the new profile unless unticked
+    const box = el('div', 'form'),
+      checks = [];
+    box.append(el('p', 'mut', `Keep your ${mine.length} change${mine.length > 1 ? 's' : ''} on top of "${p.name}"?`));
+    for (const [k, v] of mine) {
+      const row = el('label', 'frm'),
+        c = el('input');
+      c.type = 'checkbox';
+      c.checked = true;
+      checks.push([k, c]);
+      row.append(el('span', '', `${SCHEMA?.opts?.[k]?.label || k} = ${v}`), c);
+      box.append(row);
+    }
+    const foot = el('div', 'mfoot'),
+      cancel = el('button', 'btn2', 'Cancel'),
+      ok = el('button', 'primary', 'Apply profile');
+    cancel.onclick = () => {
+      closeModal();
+      profilesCard(); // dropdown back to the current profile
+    };
+    ok.onclick = async () => {
+      const keep = checks.filter(([, c]) => c.checked).map(([k]) => k);
+      const r = await op({op: 'apply_profile', kind: 'global', name: p.name, user: !p.builtin, keep});
+      closeModal();
+      if (r) toast(r.msg);
+    };
+    document.querySelectorAll('.mfoot').forEach((f) => f.remove());
+    foot.append(cancel, ok);
+    modal('Switch profile', box);
+    $('mbody').after(foot);
+    const kill = new MutationObserver(() => {
+      if ($('modal').hidden) {
+        foot.remove();
+        kill.disconnect();
+      }
+    });
+    kill.observe($('modal'), {attributes: true, attributeFilter: ['hidden']});
   };
   row.append(sel);
   const cur = PROFS.global.find((p) => p.name === sel.value);

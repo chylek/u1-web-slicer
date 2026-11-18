@@ -369,6 +369,15 @@ class Session:
         self.st["settings"] = {k: threemf.scalar(cfg[k]) for k in threemf.SETTINGS if k in cfg}
         self.st["overrides"] = {}
 
+    def my_changes(self):
+        """{key: value} the user changed on top of the applied profile (or of the project, with no profile): edits,
+        the supports button, and values set back to the project's. These survive a profile switch (keep=[keys])."""
+        ref = self.st.get("profile_ov", self.st["overrides"]) if self.st.get("profile") else {}
+        ov = self.st["overrides"]
+        mine = {k: v for k, v in ov.items() if v != ref.get(k)}
+        mine.update({k: str(self.st["settings"].get(k)) for k in ref if k not in ov})
+        return mine
+
     def profile_status(self):
         """(name, modified) for the profile dropdown: the applied profile, else the project's own process preset
         (print_settings_id minus its "@Snapmaker U1 ..." suffix) when that is one of ours. modified = the overrides
@@ -396,6 +405,7 @@ class Session:
         s = dict(self.st)
         s["slicing"] = self.slicing
         s["profile"], s["profile_modified"] = self.profile_status()
+        s["my_changes"] = self.my_changes()
         s["objects"] = [
             dict(
                 o,
@@ -1318,6 +1328,7 @@ class Session:
                 }
             if k == "apply_profile":  # {kind: global|object, name, id?}
                 kind, name = r.get("kind", "global"), r["name"]
+                mine = self.my_changes() if kind == "global" else {}
                 u = self._profiles()
                 vals = (
                     PRESETS.get(name)
@@ -1334,8 +1345,15 @@ class Session:
                     }
                     self.st["profile"] = name
                     self.st["profile_ov"] = dict(self.st["overrides"])
+                    for a in r.get("keep") or []:  # the user's own changes ride on top of the new profile
+                        if a in mine:
+                            if mine[a] == str(self.st["settings"].get(a)):
+                                self.st["overrides"].pop(a, None)
+                            else:
+                                self.st["overrides"][a] = mine[a]
                     self._label = f"profile · {name}"
-                    msg = f"profile '{name}': {len(self.st['overrides'])} settings differ from the project"
+                    kept = len([a for a in r.get("keep") or [] if a in mine])
+                    msg = f"profile '{name}' applied" + (f", {kept} of your changes kept" if kept else "")
                 else:  # merges into the object's own settings
                     o = self.obj(r["id"])
                     vals = {k: v for k, v in vals.items() if k in threemf.OBJ_SETTINGS}

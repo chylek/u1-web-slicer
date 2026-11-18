@@ -248,6 +248,13 @@ def test_profiles(new_session):
     assert s.st["overrides"].get("layer_height") == "0.2" and s.st["profile"] == "0.20mm Standard"
     s.op({"op": "set_global", "settings": {"wall_loops": "5", "wall_filament": "3"}})
     assert s.profile_status() == ("0.20mm Standard", True)
+    assert s.my_changes() == {"wall_loops": "5", "wall_filament": "3"}
+    s.op({"op": "apply_profile", "kind": "global", "name": "0.08mm Standard", "keep": ["wall_loops"]})
+    ov = s.st["overrides"]
+    assert ov["wall_loops"] == "5" and "wall_filament" not in ov and ov["layer_height"] == "0.08"
+    assert s.my_changes() == {"wall_loops": "5"}  # still marked as the user's, not the profile's
+    s.op({"op": "apply_profile", "kind": "global", "name": "0.20mm Standard"})
+    s.op({"op": "set_global", "settings": {"wall_loops": "5", "wall_filament": "3"}})
     s.profile_save("global", "Strong")
     s.op({"op": "apply_profile", "kind": "global", "name": "0.08mm Standard"})
     s.op({"op": "apply_profile", "kind": "global", "name": "Strong"})

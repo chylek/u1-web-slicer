@@ -489,11 +489,18 @@ TOOLS = {
             "kind": {"type": "string", "enum": ["global", "object"], "default": "global"},
             "object": OBJ,
             "part": {"type": ["integer", "string"]},
+            "keep": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "global only: setting keys the user changed (state.my_changes) to keep on top of the "
+                "new profile; omitted = all of them are replaced",
+            },
         },
         lambda a: op(
             op="apply_profile",
             kind=a.get("kind", "global"),
             name=a["name"],
+            keep=a.get("keep"),
             id=a.get("object"),
             part=part_index(a["object"], a.get("part")) if a.get("part") is not None else None,
         ),
