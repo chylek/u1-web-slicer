@@ -46,7 +46,7 @@ objkeys = set()
 for cls in ("PrintObjectConfig", "PrintRegionConfig"):
     i = hpp.index("    " + cls + ",")
     blk = hpp[i : hpp.index("\n)", i)]
-    objkeys |= set(re.findall(r"\(\(ConfigOption\w+,\s*(\w+)\)\)", blk))
+    objkeys |= set(re.findall(r"\(\(ConfigOption\w+(?:<[^>]*>)?,\s*(\w+)\)\)", blk))
 
 
 # option definitions
