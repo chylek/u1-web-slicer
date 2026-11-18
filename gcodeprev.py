@@ -48,12 +48,13 @@ def parse(path):
         for line in f:
             c = line[0]
             if c == ";":
-                if line.startswith(";Z:"):
-                    z = float(line[3:])
+                # U1 dialect: ";Z:" / ";TYPE:"; Bambu/generic Orca printer profiles: "; Z_HEIGHT: " / "; FEATURE: "
+                if line.startswith((";Z:", "; Z_HEIGHT:")):
+                    z = float(line.split(":", 1)[1])
                     zs.append(z)
                     layer = len(zs) - 1
-                elif line.startswith(";TYPE:"):
-                    typ = TIX.get(line[6:].strip(), len(TYPES) - 1)
+                elif line.startswith((";TYPE:", "; FEATURE:")):
+                    typ = TIX.get(line.split(":", 1)[1].strip(), len(TYPES) - 1)
                 continue
             if c == "T" and line[1:2].isdigit():
                 tool = int(line[1:].split()[0])

@@ -2058,6 +2058,11 @@ class Session:
                 meta, b = gcodeprev.parse(gcode)
                 import gzip
 
+                if not meta["count"]:  # never show an empty Layers screen as a success
+                    res.update(
+                        ok=False, error="Sliced, but the G-code has no toolpaths to preview (wrong printer profile?)"
+                    )
+
                 (gcode.parent / "preview.json").write_text(json.dumps(meta))
                 (gcode.parent / "preview.bin.gz").write_bytes(gzip.compress(b, 5))
                 w = self.st["wipe"]

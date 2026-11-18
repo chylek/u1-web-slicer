@@ -49,14 +49,16 @@ def stats(gcode):
     mm = 0.0
     with open(gcode, errors="ignore") as f:
         for line in f:
-            if line.startswith(";TYPE:"):
-                typ = line[6:].strip()
+            if line.startswith((";TYPE:", "; FEATURE:")):
+                typ = line.split(":", 1)[1].strip()
             elif line[:2] in ("G1", "G0") and typ == "Prime tower" and (m := re.search(r" E(-?[\d.]+)", line)):
                 tw += float(m[1])  # relative E (M83)
             elif line.startswith("; filament used [mm] = "):
                 mm = sum(float(x) for x in line.split("=", 1)[1].split(","))
             if line.startswith("; estimated printing time (normal mode) = "):
                 out["time"] = line.split("=", 1)[1].strip()
+            elif "time" not in out and (m2 := re.search(r"total estimated time: (.+)", line)):  # Bambu-profile header
+                out["time"] = m2[1].strip()
             elif line.startswith("; total filament used [g] = "):
                 out["grams"] = line.split("=", 1)[1].strip()
             elif line.startswith("; filament used [g] = "):
