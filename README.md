@@ -14,12 +14,13 @@ It is deliberately not a universal slicer: the printer profile, presets and prin
   to an Orca-compatible 3MF.
 - **Scene editing**: move / rotate / scale gizmo tuned for touch, lay on face, drop to bed, duplicate, arrange
   (spills onto new plates), multiple plates, per-object and per-part settings, modifiers, negative volumes,
-  support blockers/enforcers (each volume can be moved / rotated / scaled on its own with the gizmo), primitives.
+  support blockers/enforcers (each volume can be moved / rotated / scaled on its own with the gizmo), primitives;
+  an accessory placed floating on a model (a hat) is merged into it when slicing.
 - **Colour**: filament per object or part, colour painting with Orca-compatible paint trees (brush and fill),
   Full Spectrum mixes of 2-4 filaments with pigment-accurate preview, mapping a model's colours onto the
   filaments loaded in the printer (CIEDE2000).
 - **Settings**: all ~300 Orca print settings with search, help texts and basic/advanced levels; built-in U1
-  process and filament presets; your own profiles.
+  process and filament presets; your own profiles. Switching profile keeps your own changes on request.
 - **Slicing**: Snapmaker Orca CLI per plate, live progress, time and filament use, 3D G-code layer preview
   (shaded extrusion beads), thumbnails embedded for the printer screen, automatic prime tower placement.
 - **Printer**: status, temperatures, RFID filament colours, camera with ETA, upload or upload-and-print.
