@@ -1785,6 +1785,17 @@ function settingsForm(values, base, objOnly) {
           row.classList.toggle('tipo');
         };
         lab.append(el('span', 'lt', o.label), meta);
+        if (row.classList.contains('chg')) {
+          const rs = el('button', 'rst', '↺');
+          rs.type = 'button';
+          rs.title = S.profile_ov?.[k] != null ? 'Back to the profile value' : 'Back to the project value';
+          rs.onclick = async (e) => {
+            e.preventDefault();
+            rs.blur(); // a focused control inside the form blocks its re-render
+            await op({op: 'set_global', settings: {[k]: S.profile_ov?.[k] ?? S.settings[k]}});
+          };
+          lab.append(rs);
+        }
         row.append(info, lab);
         let read;
         if (o.type === 'Bool') {

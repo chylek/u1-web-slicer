@@ -1463,3 +1463,13 @@ img.cam {
   margin-right: 6px;
   font-size: 0.7em;
 }
+
+.frm .rst {
+  margin-left: 8px;
+  border: 0;
+  background: none;
+  color: var(--accent, #ff8a1f);
+  font-size: 1.1em;
+  padding: 0 4px;
+  cursor: pointer;
+}
