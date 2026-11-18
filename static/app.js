@@ -1912,6 +1912,16 @@ function profilesCard() {
   };
   row.append(sel);
   const cur = PROFS.global.find((p) => p.name === sel.value);
+  if (cur && mod) {
+    const rs = el('button', 'ibtn');
+    rs.textContent = '↺';
+    rs.title = 'Restore all values to the profile';
+    rs.onclick = async () => {
+      const r = await op({op: 'apply_profile', kind: 'global', name: cur.name, user: !cur.builtin});
+      if (r) toast(r.msg);
+    };
+    row.append(rs);
+  }
   if (cur && !cur.builtin) {
     const x = el('button', 'ibtn');
     x.innerHTML = `<span class="ic">${icon('trash')}</span>`;

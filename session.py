@@ -350,6 +350,25 @@ class Session:
             if p.stem[2:] not in cids:
                 p.unlink()
 
+    def _rebase_u1(self):
+        """A project imported from another slicer/printer (e.g. Bambu X1C) keeps that machine's settings: a U1 profile
+        layered on top shows everything as modified and Orca rejects the mix (-51). Swap in the U1 base config,
+        keeping the filament count, colours and materials (re-matched to U1 presets)."""
+        if self.cfg.get("printer_model") == "Snapmaker U1":
+            return
+        cfg = threemf.fit_flush(grow_cfg(json.loads(threemf.BASE), len(self.st["filaments"])))
+        cfg = dict(cfg, filament_colour=[f["colour"] for f in self.st["filaments"]])
+        for i, f in enumerate(self.st["filaments"]):
+            p = f.get("preset") if f.get("preset") in FILAMENTS else match_preset(f["type"])
+            if p:
+                cfg = filament_preset(cfg, i, p)
+                f.update(type=cfg["filament_type"][i], preset=p)
+        self.cfg = cfg
+        self.st["cfg_id"] = self._put_cfg(cfg)
+        self.st["bed"] = threemf.bed(cfg)
+        self.st["settings"] = {k: threemf.scalar(cfg[k]) for k in threemf.SETTINGS if k in cfg}
+        self.st["overrides"] = {}
+
     def profile_status(self):
         """(name, modified) for the profile dropdown: the applied profile, else the project's own process preset
         (print_settings_id minus its "@Snapmaker U1 ..." suffix) when that is one of ours. modified = the overrides
@@ -1309,6 +1328,7 @@ class Session:
                     raise KeyError(f"no {kind} profile '{name}'")
                 vals = {k: str(v) for k, v in vals.items() if k not in NO_PROFILE}
                 if kind == "global":  # replaces the project-level overrides
+                    self._rebase_u1()
                     self.st["overrides"] = {
                         k: v for k, v in vals.items() if k in threemf.SETTINGS and v != str(self.st["settings"].get(k))
                     }

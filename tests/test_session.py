@@ -230,6 +230,17 @@ def test_multi_component_mixes(new_session):
     assert len(s.mix_rows()) == 1 and s.obj("o1")["ext"] == [5]
 
 
+def test_foreign_printer_rebased_on_profile(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10]})
+    s.cfg = dict(s.cfg, printer_model="Bambu Lab X1 Carbon", printer_settings_id="Bambu Lab X1 Carbon 0.4 nozzle")
+    s.st["filaments"][0]["colour"] = "#123456"
+    s.op({"op": "apply_profile", "kind": "global", "name": "0.20mm Standard"})
+    assert s.cfg["printer_model"] == "Snapmaker U1" and s.st["filaments"][0]["colour"] == "#123456"
+    assert s.cfg["filament_colour"][0] == "#123456" and len(s.st["overrides"]) < 30
+    assert s.profile_status() == ("0.20mm Standard", False)
+
+
 def test_profiles(new_session):
     s = new_session()
     s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10]})
