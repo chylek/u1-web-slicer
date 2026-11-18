@@ -461,3 +461,13 @@ def test_geo_resends_only_changed_meshes(new_session):
     g2 = s.geo(s.obj(a)["gid"], have)
     assert "pos" not in g2["parts"][0] and g2["parts"][0]["key"] == g1["parts"][0]["key"]  # the solid is not resent
     assert "pos" in g2["parts"][1] and g2["parts"][1]["key"] not in have  # the moved modifier is
+
+
+def test_colour_map_fewer_palette_than_slots(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10]})
+    five = [{"colour": c} for c in U1] + [{"colour": "#123456"}]
+    s.op({"op": "apply_colour_map", "filaments": five, "map": {"1": {"kind": "phys", "ext": 2}}})
+    assert len(s.st["filaments"]) == 5
+    s.op({"op": "apply_colour_map", "filaments": five[:4], "map": {"2": {"kind": "phys", "ext": 3}}})
+    assert len(s.st["filaments"]) == 5 and s.st["filaments"][4]["colour"] == "#123456" and s.obj("o1")["ext"] == [3]

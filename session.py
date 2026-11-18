@@ -1374,8 +1374,8 @@ class Session:
             ):  # recolour the scene onto a palette: {filaments: [{colour, type}], map: {old_id: option}}
                 n = len(self.st["filaments"])
                 fs = r["filaments"]
-                if len(fs) < n:
-                    raise ValueError(f"project has {n} filaments, got {len(fs)}")
+                if len(fs) < n:  # project has extra slots (e.g. from an earlier map): keep them as they are
+                    fs = list(fs) + [{"colour": f["colour"]} for f in self.st["filaments"][len(fs) :]]
                 if len(fs) > n:  # e.g. a 2-colour project mapped onto the printer's 4 slots: add slots first
                     if self.mixes():  # mix ids sit after the physical ids and would shift
                         raise ValueError(f"project has {n} filaments and mixes, got {len(fs)}")
