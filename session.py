@@ -899,6 +899,23 @@ class Session:
             cls.append(paintree.sphere(c, float(r["sphere"]["radius"]) / k_))
         if r.get("box"):
             cls.append(local_box(r["box"]["min"], r["box"]["max"]))
+        if r.get("slab"):  # diagonal stripe: world mm between two parallel planes, d = dot(p, normal)
+            sl = r["slab"]
+            L0, L1 = self.to_local(o, [(0, 0, 0), tuple(sl["normal"])])
+            u = [L1[j] - L0[j] for j in range(3)]
+            ln = math.sqrt(sum(c * c for c in u)) or 1
+            u = [c / ln for c in u]
+            lo, hi = float(sl["d_min"]) / k_, float(sl["d_max"]) / k_
+            L0u = sum(L0[j] * u[j] for j in range(3))
+            sd = lambda p: sum(p[j] * u[j] for j in range(3)) - L0u
+
+            def slab_cl(v):
+                d = [sd(p) for p in v]
+                if all(lo <= x <= hi for x in d):
+                    return 1
+                return 0 if max(d) < lo or min(d) > hi else -1
+
+            cls.append(slab_cl)
         if r.get("inside_part") is not None:
             pv = self.geos[o["gid"]]["parts"][self.part_index(o, r["inside_part"])]["verts"]
             cls.append(

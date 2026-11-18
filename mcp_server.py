@@ -384,7 +384,9 @@ TOOLS = {
         "'up'|'down'|'side'|'+x'|'-x'|'+y'|'-y' or [x,y,z] "
         "with max_angle (deg, default 45); sphere {center:[x,y,z], radius}; box {min:[..], max:[..]}; "
         "inside_part (index/name, e.g. a modifier "
-        "volume, uses its bounding box). The mesh is never changed: like Orca, triangles crossing the region "
+        "volume, uses its bounding box); slab {normal:[x,y,z], d_min, d_max} = the band between two parallel planes "
+        "(world mm along the unit normal from the origin) for diagonal "
+        "stripes. The mesh is never changed: like Orca, triangles crossing the region "
         "border get a paint tree split "
         "down to `detail` mm (default 0.5), so borders are sharp even on coarse meshes.",
         {
@@ -401,6 +403,7 @@ TOOLS = {
             "max_angle": {"type": "number"},
             "sphere": {"type": "object"},
             "box": {"type": "object"},
+            "slab": {"type": "object"},
             "inside_part": {"type": ["integer", "string"]},
             "detail": {"type": "number"},
         },
