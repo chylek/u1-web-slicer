@@ -258,6 +258,31 @@ def do_slice(only=None):
         S.set_slicing(False)
 
 
+def _merge_floating(plates):
+    """An object floating above the bed that overlaps another one (a hat placed on a model) is folded into it as
+    parts, so it prints with it instead of in mid-air. Returns the merge messages."""
+    out = []
+    while True:
+        with S.lock:
+            objs = [o for p in plates for o in S.on_plate(p)]
+            bb = {o["id"]: S.bbox(o) for o in objs}
+            hit = None
+            for f in sorted(objs, key=lambda o: bb[o["id"]][4]):
+                if bb[f["id"]][4] <= 0.05:
+                    continue
+                a = bb[f["id"]]
+                for g in sorted(objs, key=lambda o: bb[o["id"]][4]):
+                    b = bb[g["id"]]
+                    if g is not f and all(a[2 * i] <= b[2 * i + 1] and b[2 * i] <= a[2 * i + 1] for i in range(3)):
+                        hit = (g["id"], f["id"])
+                        break
+                if hit:
+                    break
+        if not hit:
+            return out
+        out.append(S.op({"op": "merge_object", "id": hit[0], "src": hit[1]})["msg"])
+
+
 def _do_slice(only=None):
     """slice every plate that has objects (or just `only`); the result keeps one entry per plate + totals.
     Each plate is its own G-code: send and print them one after another."""
@@ -265,6 +290,7 @@ def _do_slice(only=None):
         todo = [p for p in range(1, S.nplates() + 1) if S.on_plate(p)] if only is None else [only]
     if not todo:
         return {"ok": False, "error": "nothing to slice — the plates are empty"}
+    merged = _merge_floating(todo)
     with S.lock:
         floating = [
             (o["name"], S.bbox(o)[4]) for p in todo for o in S.on_plate(p) if S.bbox(o)[4] > 0.05
@@ -296,6 +322,7 @@ def _do_slice(only=None):
     total = {
         "ok": bool(ok),
         "partial": len(ok) < len(plates),
+        "merged": merged,
         "plates": plates,
         "job": first.get("job"),
         "gcode": first.get("gcode"),
