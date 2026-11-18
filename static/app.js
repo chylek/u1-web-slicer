@@ -1164,7 +1164,7 @@ function objRows(L, list) {
         };
         pr.append(
           nm,
-          ...(p.type !== 'normal_part' ? [st] : []),
+          st,
           del,
           ...(['negative_part', 'support_blocker', 'support_enforcer'].includes(p.type)
             ? []
