@@ -1773,6 +1773,8 @@ function settingsForm(values, base, objOnly) {
         row.dataset.q = [o.label, k, pg.name, gr.name].join(' ').toLowerCase();
         row.dataset.k = k;
         row.dataset.adv = o.adv ? 1 : '';
+        // global form: dot on every value that differs from what the applied profile gave (supports button, edits)
+        if (!base && !objOnly && (S.overrides?.[k] ?? null) !== (S.profile_ov?.[k] ?? null)) row.classList.add('chg');
         const meta = el('span', 'meta');
         meta.append(el('span', 'badge ' + (o.adv ? 'adv' : 'basic'), o.adv ? 'Advanced' : 'Basic'), el('code', '', k));
         const info = el('button', 'info', 'i');
@@ -1953,7 +1955,7 @@ function profilesCard() {
 let gformKey = '';
 async function globalSettings() {
   await schemaReady;
-  const key = JSON.stringify([S.settings, S.overrides]);
+  const key = JSON.stringify([S.settings, S.overrides, S.profile_ov]);
   if (key === gformKey || $('gset').contains(document.activeElement)) return;
   gformKey = key;
   const vals = Object.assign({}, S.settings, S.overrides);

@@ -1455,3 +1455,11 @@ img.cam {
 .profs select.mod {
   border-color: var(--accent, #ff7a33);
 }
+
+.frm.chg .lt .lt::before,
+.frm.chg > .lab > .lt::before {
+  content: '●';
+  color: var(--accent, #ff8a1f);
+  margin-right: 6px;
+  font-size: 0.7em;
+}
