@@ -2268,7 +2268,7 @@ function partModal(o, i) {
         inp = el('input');
       inp.type = 'number';
       inp.inputMode = 'decimal';
-      inp.value = v.toFixed(1);
+      inp.value = inp.defaultValue = v.toFixed(1); // defaultValue drives the "did the user edit it" check on Apply
       pos[a] = inp;
       r.append(el('span', '', `Position ${a.toUpperCase()} (mm)`), inp);
       box.firstChild.append(r);
