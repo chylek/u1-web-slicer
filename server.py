@@ -150,6 +150,19 @@ def slice_plate(p):
     else:
         log = [ln for ln in pr.stdout.splitlines() + pr.stderr.splitlines() if "error" in ln.lower()]
         res.update(ok=False, error=(err or "slicing failed").strip() + (" | " + log[-1][-200:] if log else ""))
+        try:  # Orca's real reason sits in result.json's per-plate warning_message, not in error_string
+            why = [x.get("warning_message") for x in json.loads(rj.read_text()).get("sliced_plates", [])]
+        except (OSError, ValueError):
+            why = []
+        why = next((w.strip().replace("\n", " ") for w in why if w), "")
+        if why:
+            hint = ""
+            if "empty layer" in why:
+                hint = (
+                    " Hint: a part has a gap or a too-thin section at that height. Check the part is solid there "
+                    "(look at the Z range in the 3D view), scale it up, or lower layer height / raise wall count."
+                )
+            res["error"] = f"{why}{hint} ({res['error']})"
         if "conflict" in res["error"].lower():
             with S.lock:
                 ov = S.overlaps()
