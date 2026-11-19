@@ -2318,8 +2318,9 @@ function partModal(o, i) {
     partModal(byId(o.id), i);
   };
   ok.onclick = async () => {
-    const mv = ['x', 'y', 'z'].some((a) => Math.abs(+pos[a].value - +pos[a].defaultValue) > 0.05)
-      ? await op({op: 'move_part', id: o.id, part: i, x: +pos.x.value, y: +pos.y.value, z: +pos.z.value})
+    const ch = ['x', 'y', 'z'].filter((a) => Math.abs(+pos[a].value - +pos[a].defaultValue) > 0.05); // omitted axis stays
+    const mv = ch.length
+      ? await op({op: 'move_part', id: o.id, part: i, ...Object.fromEntries(ch.map((a) => [a, +pos[a].value]))})
       : true;
     if (mv && (await op({op: 'set_part', id: o.id, part: i, cfg: f.read(), name: nm.value}))) {
       closeModal();

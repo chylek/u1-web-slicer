@@ -1580,8 +1580,8 @@ class Session:
                 p = g["parts"][i]
                 m = o["m"]
                 V = p["verts"]
-                n = len(V) or 1
-                c = [sum(v[j] for v in V) / n for j in range(3)]  # local centre
+                # local bbox centre: the same point the part dialog shows (a vertex mean differs for irregular parts)
+                c = [(min(v[j] for v in V) + max(v[j] for v in V)) / 2 for j in range(3)] if V else [0, 0, 0]
                 w = [
                     c[0] * m[0] + c[1] * m[3] + c[2] * m[6] + m[9],
                     c[0] * m[1] + c[1] * m[4] + c[2] * m[7] + m[10],

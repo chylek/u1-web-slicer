@@ -397,6 +397,28 @@ def test_modifier_objects_and_replace_colour(new_session):
     assert 3 in s.used_ids([s.obj(o0)])
 
 
+def test_move_part_to_its_own_centre_is_a_noop(new_session):
+    """the part dialog shows the bbox centre; move_part must use the same point (vertex mean differs)"""
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [20, 20, 20], "x": 50, "y": 50})
+    a = s.st["objects"][0]["id"]
+    r = s.op({"op": "add_part", "id": a, "kind": "modifier", "shape": "box", "size": [5, 5, 5]})
+    p = s.own_geo(s.obj(a))["parts"][r["part"]]
+    p["verts"] = (
+        list(p["verts"]) + [(p["verts"][0][0], p["verts"][0][1], p["verts"][0][2])] * 20
+    )  # lopsided vertex mean
+    s._vcache.pop(s.obj(a)["gid"], None)
+    before = s.bbox(s.obj(a))
+    verts = s.geos[s.obj(a)["gid"]]["parts"][r["part"]]["verts"]
+    m = s.obj(a)["m"]
+    c = [(min(v[j] for v in verts) + max(v[j] for v in verts)) / 2 for j in range(3)]
+    w = [c[0] + m[9], c[1] + m[10], c[2] + m[11]]
+    s.op({"op": "move_part", "id": a, "part": r["part"], "x": w[0], "y": w[1], "z": w[2]})
+    v2 = s.geos[s.obj(a)["gid"]]["parts"][r["part"]]["verts"]
+    assert all(abs(x - y) < 1e-6 for u, v in zip(verts, v2) for x, y in zip(u, v))
+    assert s.bbox(s.obj(a)) == before
+
+
 def test_palette_fixture_matches_expectations():
     assert colormix.best(PALETTE[1], U1)["ext"] == 3 and colormix.best(PALETTE[2], U1)["ext"] == 2
 
