@@ -493,3 +493,23 @@ def test_colour_map_fewer_palette_than_slots(new_session):
     assert len(s.st["filaments"]) == 5
     s.op({"op": "apply_colour_map", "filaments": five[:4], "map": {"2": {"kind": "phys", "ext": 3}}})
     assert len(s.st["filaments"]) == 5 and s.st["filaments"][4]["colour"] == "#123456" and s.obj("o1")["ext"] == [3]
+
+
+def test_filament_count_and_colour(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10], "ext": 4})
+    s.op({"op": "set_filament_count", "count": 3})
+    assert len(s.st["filaments"]) == 3 and len(s.cfg["filament_colour"]) == 3 and len(s.cfg["filament_type"]) == 3
+    assert s.obj("o1")["ext"] == [1]  # sat on the removed slot -> falls back to 1
+    s.op({"op": "set_filament_count", "count": 4})
+    assert len(s.st["filaments"]) == 4 and len(s.cfg["filament_colour"]) == 4
+    s.op({"op": "set_filament_colour", "filament": 2, "colour": "#12ab34"})
+    assert s.st["filaments"][1]["colour"] == "#12AB34" and s.cfg["filament_colour"][1] == "#12AB34"
+    for bad in ({"filament": 2, "colour": "red"}, {"filament": 9, "colour": "#112233"}):
+        with pytest.raises(ValueError):
+            s.op({"op": "set_filament_colour", **bad})
+    with pytest.raises(ValueError):
+        s.op({"op": "set_filament_count", "count": 5})
+    s.op({"op": "mix_add", "a": 1, "b": 2})
+    with pytest.raises(ValueError):
+        s.op({"op": "set_filament_count", "count": 3})

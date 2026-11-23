@@ -1606,7 +1606,8 @@ function filTab() {
     ['+ Add filament', 1],
   ]) {
     const b = el('button', 'btn2', lbl);
-    b.disabled = !(1 <= nPhys() + d && nPhys() + d <= 4);
+    b.disabled = mix.length > 0 || !(1 <= nPhys() + d && nPhys() + d <= 4);
+    if (mix.length) b.title = 'Remove the mixed colours first';
     b.onclick = () => op({op: 'set_filament_count', count: nPhys() + d});
     cnt.append(b);
   }
