@@ -348,6 +348,8 @@ def _do_slice(only=None):
         ),
         "seconds": round(sum(x["seconds"] for x in plates), 1),
     }
+    if any(x.get("tower_g") for x in ok):  # every plate has its own tower: add them up
+        total["tower_g"] = round(sum(x.get("tower_g") or 0 for x in ok), 1)
     errs = [f"plate {x['plate']}: {x['error']}" if len(plates) > 1 else x["error"] for x in plates if not x.get("ok")]
     if errs:
         total["error"] = " · ".join(errs)
