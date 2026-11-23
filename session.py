@@ -1502,7 +1502,11 @@ class Session:
             elif k == "rebase_u1":  # project from another printer (Bambu...): Orca rejects it with -51 on the U1
                 was = self.cfg.get("printer_model")
                 self._rebase_u1()
-                msg = f"converted from {was} to U1 settings" if was != self.cfg.get("printer_model") else "already U1"
+                msg = (
+                    f"converted from {was} to U1 settings (print settings reset to the U1 defaults, colours kept)"
+                    if was != self.cfg.get("printer_model")
+                    else "already U1"
+                )
             elif k == "set_filament_count":  # {count: 1-4}; new slots clone the last one, removed ones fall back to 1
                 m, n = int(r["count"]), len(self.st["filaments"])
                 if not 1 <= m <= 4:
