@@ -186,6 +186,22 @@ def grow_cfg(cfg, m):
     return cfg
 
 
+def shrink_cfg(cfg, m):
+    """inverse of grow_cfg: drop the trailing filament slots down to m"""
+    n = len(cfg["filament_type"])
+    step = [int(x) for x in cfg.get("filament_flow_step_size") or ["1"] * n]
+    cfg = dict(cfg)
+    for k, v in cfg.items():
+        if not isinstance(v, list):
+            continue
+        if k in FLOW_KEYS and len(v) == sum(step):
+            cfg[k] = v[: sum(step[:m])]
+        elif len(v) == n:
+            cfg[k] = v[:m]
+    cfg["filament_flow_step_size"] = [str(x) for x in step[:m]]
+    return cfg
+
+
 def match_preset(type_, vendor="", sub=""):
     """best U1 preset for what the printer reports (type PLA/TPU..., vendor, sub_type) or None"""
     c = [
@@ -1244,6 +1260,8 @@ class Session:
         "xform_part": "transform volume",
         "set_role": "object role",
         "set_filaments": "filament colours",
+        "set_filament_colour": "filament colour",
+        "set_filament_count": "filament count",
         "set_filament_preset": "filament preset",
         "set_filament_temps": "filament temperatures",
         "set_filament_values": "filament settings",
@@ -1437,6 +1455,34 @@ class Session:
                 self.cfg = cfg
                 self.st["cfg_id"] = self._put_cfg(cfg)
                 msg = "colours synced" + (" — material changed: " + "; ".join(warn) if warn else "")
+            elif k == "set_filament_count":  # {count: 1-4}; new slots clone the last one, removed ones fall back to 1
+                m, n = int(r["count"]), len(self.st["filaments"])
+                if not 1 <= m <= 4:
+                    raise ValueError("the U1 has 1-4 filament slots")
+                if m != n:
+                    if self.mixes():
+                        raise ValueError("remove the mixed colours first (their ids sit after the filaments)")
+                    if m > n:
+                        self.cfg = grow_cfg(self.cfg, m)
+                        self.st["filaments"] += [dict(self.st["filaments"][-1]) for _ in range(m - n)]
+                    else:
+                        self.cfg = shrink_cfg(self.cfg, m)
+                        del self.st["filaments"][m:]
+                        self._remap(self.st["objects"], lambda e: e if e <= m else 1)
+                    self.cfg["filament_colour"] = [f["colour"] for f in self.st["filaments"]]
+                    self.st["cfg_id"] = self._put_cfg(self.cfg)
+                msg = f"{m} filaments"
+            elif k == "set_filament_colour":  # {filament: 1-based, colour: '#rrggbb'}
+                i = int(r["filament"]) - 1
+                c = str(r["colour"]).upper()
+                if not 0 <= i < len(self.st["filaments"]) or not re.fullmatch(r"#[0-9A-F]{6}", c):
+                    raise ValueError("bad filament or colour")
+                self.st["filaments"][i]["colour"] = c
+                cfg = dict(self.cfg)
+                cfg["filament_colour"] = [f["colour"] for f in self.st["filaments"]]
+                self.cfg = cfg
+                self.st["cfg_id"] = self._put_cfg(cfg)
+                msg = f"filament {i + 1} colour {c}"
             elif k == "set_filament_preset":  # {filament: 1-based, preset: Orca filament preset name}
                 i = int(r["filament"]) - 1
                 if not 0 <= i < len(self.st["filaments"]):

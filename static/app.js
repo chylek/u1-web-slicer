@@ -1492,6 +1492,7 @@ async function filamentModal(i) {
     box.append(r);
     return input;
   };
+  const col = row('Colour', Object.assign(el('input'), {type: 'color', value: f.colour.toLowerCase()}));
   row('Preset', ps);
   const inp = {};
   for (const [k, l, u] of FILFIELDS)
@@ -1514,6 +1515,11 @@ async function filamentModal(i) {
     save = el('button', 'btn2', 'Save as my preset…'),
     ok = el('button', 'primary', 'Apply');
   async function apply() {
+    if (
+      col.value.toUpperCase() !== f.colour.toUpperCase() &&
+      !(await op({op: 'set_filament_colour', filament: i + 1, colour: col.value}))
+    )
+      return false;
     if (
       ps.value &&
       ps.value !== f.preset &&
@@ -1594,11 +1600,22 @@ function filTab() {
     r.onclick = () => filamentModal(i);
     c1.append(r);
   });
+  const cnt = el('div', 'mfoot');
+  for (const [lbl, d] of [
+    ['− Remove last', -1],
+    ['+ Add filament', 1],
+  ]) {
+    const b = el('button', 'btn2', lbl);
+    b.disabled = !(1 <= nPhys() + d && nPhys() + d <= 4);
+    b.onclick = () => op({op: 'set_filament_count', count: nPhys() + d});
+    cnt.append(b);
+  }
+  c1.append(cnt);
   c1.append(
     el(
       'small',
       'mut',
-      'Tap a filament to pick its Orca preset (PLA, PETG, TPU…) or change temperatures. Sync from the printer picks presets automatically.'
+      'Tap a filament to pick its colour, Orca preset (PLA, PETG, TPU…) or temperatures. Sync from the printer picks presets automatically.'
     )
   );
   F.append(c1);
