@@ -1138,7 +1138,7 @@ class Session:
             for o, q, px, py in place:
                 o["plate"] = p
                 self.translate(o, ox + px - q[0], oy + (H - py) - (q[3] - q[2]) - q[2])
-            if w["enabled"] and p == (plate or 1):
+            if w["enabled"]:
                 self._set_wipe_xy(  # back edge, away from the door (front = low y)
                     p, min(ox + W + GAP - f[0], b["x1"] - 2 - f[1]), b["y1"] - 2 - f[3]
                 )

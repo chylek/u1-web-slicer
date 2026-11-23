@@ -544,3 +544,22 @@ def test_prime_tower_follows_plate_delete_and_arrange(new_session):
     assert s.nplates() == 2 and (s.wipe_xy(1), s.wipe_xy(2)) == ((11, 12), (31, 32))  # old plate 3 keeps its tower
     s.op({"op": "arrange", "plate": 2})
     assert s.wipe_xy(2) != (31, 32) and s.wipe_xy(1) == (11, 12)  # arrange moved plate 2's tower only
+
+
+def test_arrange_all_places_each_plates_tower(new_session):
+    s = new_session()
+    for pl in (1, 2):
+        if pl > 1:
+            s.op({"op": "add_plate"})
+        for e in (2, 3):
+            s.op({"op": "add_primitive", "shape": "box", "size": [100, 100, 20], "ext": e, "plate": pl})
+    for p in (1, 2):
+        s.op({"op": "set_wipe", "x": 5, "y": 5, "plate": p})
+    s.op({"op": "arrange", "all": True})
+    f = s.st["wipe"]["fp"]
+    for p in range(1, s.nplates() + 1):
+        x, y = s.wipe_xy(p)
+        assert (x, y) != (5, 5), p  # moved beside the repacked objects
+        for o in s.on_plate(p):
+            q = s.bbox(o)
+            assert x + f[0] >= q[1] or x + f[1] <= q[0], (p, q)  # beside, not on top
