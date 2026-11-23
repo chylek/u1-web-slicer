@@ -276,6 +276,7 @@ class Session:
         self.dirty.clear()
         if record and self.st.get("result") and not str(label or "").startswith("open "):
             self.st["result"] = dict(self.st["result"], stale=True)  # the plate changed since slicing
+        self.st["wipe"]["need"] = [self.needs_tower(self.on_plate(p)) for p in range(1, self.nplates() + 1)]
         self.rev += 1
         self.st["rev"] = self.rev
         (self.dir / "state.json").write_text(json.dumps(self.st))
