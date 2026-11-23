@@ -632,7 +632,9 @@ async function apply(st) {
     } else closePaint();
   }
   // wipe tower: each plate has its own position (st.wipe.pos[i] = [x, y])
-  wipeMeshes.forEach((w, i) => (w.visible = st.wipe.enabled && !PV && objs.some((o) => o.plate === i + 1)));
+  wipeMeshes.forEach(
+    (w, i) => (w.visible = (st.wipe.need?.[i] ?? st.wipe.enabled) && !PV && objs.some((o) => o.plate === i + 1))
+  );
   if (wipeMeshes.length && !drag?.wipe) showWipe();
   $('slice').disabled = $('save').disabled = false;
   setSlicing(!!st.slicing);
@@ -3037,7 +3039,9 @@ function closePreview() {
   }
   PV = null;
   for (const o of objs) o.group.visible = true;
-  wipeMeshes.forEach((w, i) => (w.visible = S.wipe.enabled && objs.some((o) => o.plate === i + 1)));
+  wipeMeshes.forEach(
+    (w, i) => (w.visible = (S.wipe.need?.[i] ?? S.wipe.enabled) && objs.some((o) => o.plate === i + 1))
+  );
   $('prevbar').hidden = true;
   if ($('sheet').dataset.state === 'peek') $('sheet').dataset.state = 'half';
 }

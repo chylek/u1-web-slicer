@@ -1060,7 +1060,7 @@ class Session:
         """shelf-pack (o, bbox) items (tallest first) into one plate: returns (placed [(o, q, x, y)], W, H, leftover)"""
         b, w = self.st["bed"], self.st["wipe"]
         f = w["fp"]
-        ww = (f[1] - f[0] + GAP) if w["enabled"] else 0
+        ww = (f[1] - f[0] + GAP) if self.needs_tower([o for o, _ in items]) else 0
         maxw, maxh = b["x1"] - b["x0"] - 2 * GAP - ww, b["y1"] - b["y0"] - 2 * GAP
         total = sum((q[1] - q[0] + GAP) * (q[3] - q[2] + GAP) for _, q in items)
         roww = min(maxw, max(*(q[1] - q[0] for _, q in items), math.sqrt(total) * 1.15))
@@ -1133,12 +1133,13 @@ class Session:
         used = set()
         while items:
             place, W, H, items = self._pack(items)
-            ww = (f[1] - f[0] + GAP) if w["enabled"] else 0
+            need = self.needs_tower([o for o, *_ in place])  # towers only where the plate has 2+ filaments
+            ww = (f[1] - f[0] + GAP) if need else 0
             ox, oy = (b["x0"] + b["x1"]) / 2 - (W + ww) / 2, (b["y0"] + b["y1"]) / 2 - H / 2
             for o, q, px, py in place:
                 o["plate"] = p
                 self.translate(o, ox + px - q[0], oy + (H - py) - (q[3] - q[2]) - q[2])
-            if w["enabled"]:
+            if need:
                 self._set_wipe_xy(  # back edge, away from the door (front = low y)
                     p, min(ox + W + GAP - f[0], b["x1"] - 2 - f[1]), b["y1"] - 2 - f[3]
                 )
@@ -1157,7 +1158,7 @@ class Session:
         q = self.bbox(o)
         sx, sy = q[1] - q[0], q[3] - q[2]
         boxes = [self.bbox(x) for x in self.on_plate(o.get("plate", 1)) if x is not o]
-        if w["enabled"]:
+        if self.needs_tower(self.on_plate(o.get("plate", 1)) + [o]):
             f = w["fp"]
             wx, wy = self.wipe_xy(o.get("plate", 1))
             boxes.append([wx + f[0], wx + f[1], wy + f[2], wy + f[3]])
@@ -1198,10 +1199,11 @@ class Session:
                 out.append(o["name"])
         return out
 
-    def needs_tower(self):
-        """a prime tower is only useful when the objects use 2+ filaments (parts, paint, or a mix = 2+ physical ones)"""
+    def needs_tower(self, objs=None):
+        """a prime tower is only useful when the objects (default: all; or one plate's) use 2+ filaments
+        (parts, paint, or a mix = 2+ physical ones)"""
         n, used = len(self.st["filaments"]), set()
-        for o in self.st["objects"]:
+        for o in self.st["objects"] if objs is None else objs:
             used.update(e for e in o["ext"] if e)
             for p in self.geos[o["gid"]]["parts"]:
                 for c in p.get("paint") or ():
@@ -1229,11 +1231,12 @@ class Session:
         Returns "" | "moved" | "conflict" (worst over the plates)."""
         w = self.st["wipe"]
         w["enabled"] = self.needs_tower()
+        w["need"] = [self.needs_tower(self.on_plate(p)) for p in range(1, self.nplates() + 1)]
         if not w["enabled"] or not self.st["objects"]:
             return ""
         out = ""
         for p in range(1, self.nplates() + 1):
-            r = self._fix_wipe_plate(p)
+            r = self._fix_wipe_plate(p) if w["need"][p - 1] else ""
             out = "conflict" if "conflict" in (out, r) else r or out
         return out
 
@@ -1615,6 +1618,7 @@ class Session:
                 if r.get("x") is None:
                     self.place_free(o)
                 msg = f"added {o['id']}"
+                self.fix_wipe()
                 self._commit(True)
                 return {"ok": True, "rev": self.rev, "msg": msg, "id": o["id"], "off_bed": self.off_bed()}
             elif k == "add_part":  # modifier / negative volume / support blocker|enforcer / extra part inside an object
@@ -2193,7 +2197,7 @@ class Session:
                 self.cfg,
                 geos,
                 objs,
-                {"x": x, "y": y} if w["enabled"] else None,
+                {"x": x, "y": y} if self.needs_tower(self.on_plate(plate)) else None,
                 self.st["mix"],
                 self.st["overrides"],
             )

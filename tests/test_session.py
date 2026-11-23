@@ -563,3 +563,17 @@ def test_arrange_all_places_each_plates_tower(new_session):
         for o in s.on_plate(p):
             q = s.bbox(o)
             assert x + f[0] >= q[1] or x + f[1] <= q[0], (p, q)  # beside, not on top
+
+
+def test_tower_only_on_plates_that_need_it(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10], "ext": 2})  # plate 1: one filament
+    s.op({"op": "add_plate"})
+    for e in (2, 3):
+        s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10], "ext": e, "plate": 2})
+    assert s.st["wipe"]["need"] == [False, True] and s.st["wipe"]["enabled"]
+    # plate 1 packs without reserving room for a tower: its box ends up closer to the bed centre than with one
+    s.op({"op": "arrange", "plate": 1})
+    b = s.st["bed"]
+    q = s.bbox(s.on_plate(1)[0])
+    assert abs((q[0] + q[1]) / 2 - (b["x0"] + b["x1"]) / 2) < 1
