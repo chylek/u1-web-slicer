@@ -1304,6 +1304,7 @@ class Session:
         "set_role": "object role",
         "set_filaments": "filament colours",
         "set_filament_colour": "filament colour",
+        "rebase_u1": "convert to U1 settings",
         "set_filament_count": "filament count",
         "set_filament_preset": "filament preset",
         "set_filament_temps": "filament temperatures",
@@ -1498,6 +1499,10 @@ class Session:
                 self.cfg = cfg
                 self.st["cfg_id"] = self._put_cfg(cfg)
                 msg = "colours synced" + (" — material changed: " + "; ".join(warn) if warn else "")
+            elif k == "rebase_u1":  # project from another printer (Bambu...): Orca rejects it with -51 on the U1
+                was = self.cfg.get("printer_model")
+                self._rebase_u1()
+                msg = f"converted from {was} to U1 settings" if was != self.cfg.get("printer_model") else "already U1"
             elif k == "set_filament_count":  # {count: 1-4}; new slots clone the last one, removed ones fall back to 1
                 m, n = int(r["count"]), len(self.st["filaments"])
                 if not 1 <= m <= 4:

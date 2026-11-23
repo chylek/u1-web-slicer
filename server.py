@@ -303,6 +303,10 @@ def _do_slice(only=None):
         todo = [p for p in range(1, S.nplates() + 1) if S.on_plate(p)] if only is None else [only]
     if not todo:
         return {"ok": False, "error": "nothing to slice — the plates are empty"}
+    with S.lock:
+        foreign = S.cfg.get("printer_model") != "Snapmaker U1"
+    if foreign:  # e.g. a Bambu project: Orca would stop with -51 ("incorrect slicing parameters")
+        conv = S.op({"op": "rebase_u1"})["msg"]
     merged = _merge_floating(todo)
     with S.lock:
         floating = [
@@ -353,7 +357,7 @@ def _do_slice(only=None):
     errs = [f"plate {x['plate']}: {x['error']}" if len(plates) > 1 else x["error"] for x in plates if not x.get("ok")]
     if errs:
         total["error"] = " · ".join(errs)
-    warns = [
+    warns = ([conv] if foreign else []) + [
         f"plate {x['plate']}: {x['warning']}" if len(plates) > 1 else x["warning"] for x in plates if x.get("warning")
     ]
     if warns:

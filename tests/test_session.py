@@ -577,3 +577,11 @@ def test_tower_only_on_plates_that_need_it(new_session):
     b = s.st["bed"]
     q = s.bbox(s.on_plate(1)[0])
     assert abs((q[0] + q[1]) / 2 - (b["x0"] + b["x1"]) / 2) < 1
+
+
+def test_rebase_u1_op(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10]})
+    s.cfg = dict(s.cfg, printer_model="Bambu Lab A1 mini")
+    assert "Bambu Lab A1 mini" in s.op({"op": "rebase_u1"})["msg"] and s.cfg["printer_model"] == "Snapmaker U1"
+    assert s.op({"op": "rebase_u1"})["msg"] == "already U1"
