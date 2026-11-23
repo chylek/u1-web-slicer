@@ -1046,6 +1046,15 @@ class Session:
         for o in self.st["objects"]:
             o["plate"] = new[o.get("plate", 1)]
         self.st["plates"] = max(len(used), 1)
+        self._renumber_wipe(used)
+
+    def _renumber_wipe(self, old_plates):
+        """towers follow their plates: new plate i+1 was old_plates[i]"""
+        w = self.st["wipe"]
+        pos = w.get("pos")
+        if pos:
+            w["pos"] = [pos[p - 1] if p <= len(pos) else [w["x"], w["y"]] for p in old_plates]
+            w["x"], w["y"] = w["pos"][0]
 
     def _pack(self, items):
         """shelf-pack (o, bbox) items (tallest first) into one plate: returns (placed [(o, q, x, y)], W, H, leftover)"""
@@ -1130,8 +1139,9 @@ class Session:
                 o["plate"] = p
                 self.translate(o, ox + px - q[0], oy + (H - py) - (q[3] - q[2]) - q[2])
             if w["enabled"] and p == (plate or 1):
-                w["x"] = min(ox + W + GAP - f[0], b["x1"] - 2 - f[1])
-                w["y"] = b["y1"] - 2 - f[3]  # back edge, away from the door (front = low y)
+                self._set_wipe_xy(  # back edge, away from the door (front = low y)
+                    p, min(ox + W + GAP - f[0], b["x1"] - 2 - f[1]), b["y1"] - 2 - f[3]
+                )
             used.add(p)
             p = (p + 1) if spill_to is None else spill_to
             spill_to = None if spill_to is None else spill_to + 1
@@ -1872,6 +1882,7 @@ class Session:
                     if o.get("plate", 1) > p:
                         o["plate"] -= 1
                 self.st["plates"] = n_ - 1
+                self._renumber_wipe([q for q in range(1, n_ + 1) if q != p])
                 msg = f"plate {p} deleted" + (f" with {len(gone)} objects" if gone else "")
             elif k == "set_wipe":
                 self._set_wipe_xy(int(r.get("plate", 1)), float(r["x"]), float(r["y"]))

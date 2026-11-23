@@ -529,3 +529,18 @@ def test_prime_tower_is_per_plate(new_session):
     assert s.wipe_xy(2) == (150, 100)
     ui, _ = threemf.parse(s.build())  # saved as one position per plate
     assert ui["wipe"]["pos"][:2] == [[20, 30], [150, 100]]
+
+
+def test_prime_tower_follows_plate_delete_and_arrange(new_session):
+    s = new_session()
+    for pl in (1, 2, 3):
+        for e in (2, 3):  # two colours per plate -> tower needed
+            if pl > 1 and e == 2:
+                s.op({"op": "add_plate"})
+            s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10], "ext": e, "plate": pl})
+    for p, xy in ((1, (11, 12)), (2, (21, 22)), (3, (31, 32))):
+        s.op({"op": "set_wipe", "x": xy[0], "y": xy[1], "plate": p})
+    s.op({"op": "del_plate", "plate": 2})
+    assert s.nplates() == 2 and (s.wipe_xy(1), s.wipe_xy(2)) == ((11, 12), (31, 32))  # old plate 3 keeps its tower
+    s.op({"op": "arrange", "plate": 2})
+    assert s.wipe_xy(2) != (31, 32) and s.wipe_xy(1) == (11, 12)  # arrange moved plate 2's tower only
