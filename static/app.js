@@ -631,9 +631,9 @@ async function apply(st) {
       pbTri();
     } else closePaint();
   }
-  // wipe tower: same spot on every plate (one shared position)
+  // wipe tower: each plate has its own position (st.wipe.pos[i] = [x, y])
   wipeMeshes.forEach((w, i) => (w.visible = st.wipe.enabled && !PV && objs.some((o) => o.plate === i + 1)));
-  if (wipeMeshes.length && !drag?.wipe) showWipe(st.wipe.x, st.wipe.y);
+  if (wipeMeshes.length && !drag?.wipe) showWipe();
   $('slice').disabled = $('save').disabled = false;
   setSlicing(!!st.slicing);
   $('undo').disabled = !st.can_undo;
@@ -874,16 +874,20 @@ function setOrtho(on) {
 }
 const ovhAngle = () => +(S?.overrides?.support_threshold_angle ?? S?.settings?.support_threshold_angle ?? 30) || 30;
 
-function showWipe(x, y) {
+const wipeXY = (i) => S.wipe.pos?.[i] || [S.wipe.x, S.wipe.y];
+function showWipe(at) {
+  // at = {i, x, y}: a tower being dragged; everything else comes from the scene
   const f = S.wipe.fp;
-  for (const w of wipeMeshes) {
+  wipeMeshes.forEach((w, i) => {
+    const [x, y] = at?.i === i ? [at.x, at.y] : wipeXY(i);
     w.scale.set(f[1] - f[0], f[3] - f[2], 1);
     w.position.set(x + (f[0] + f[1]) / 2, y + (f[2] + f[3]) / 2, 20);
-  }
+  });
+  const [x, y] = at ? [at.x, at.y] : wipeXY(curPlate - 1);
   $('wx').value = Math.round(x);
   $('wy').value = Math.round(y);
 }
-$('wx').onchange = $('wy').onchange = () => op({op: 'set_wipe', x: +$('wx').value, y: +$('wy').value});
+$('wx').onchange = $('wy').onchange = () => op({op: 'set_wipe', x: +$('wx').value, y: +$('wy').value, plate: curPlate});
 
 // ---------- panels
 function refresh() {
@@ -3132,7 +3136,14 @@ cv.addEventListener('pointerdown', (e) => {
     ).length
   ) {
     const g = ground(e);
-    drag = {wipe: true, g0: g, x0: S.wipe.x, y0: S.wipe.y};
+    const i = wipeMeshes.indexOf(
+        ray.intersectObjects(
+          wipeMeshes.filter((w) => w.visible),
+          false
+        )[0].object
+      ),
+      [x0, y0] = wipeXY(i);
+    drag = {wipe: true, i, g0: g, x0, y0};
     ctl.enabled = false;
     return;
   }
@@ -3156,7 +3167,7 @@ cv.addEventListener('pointermove', (e) => {
   if (drag.wipe) {
     drag.x = drag.x0 + g.x - drag.g0.x;
     drag.y = drag.y0 + g.y - drag.g0.y;
-    showWipe(drag.x, drag.y);
+    showWipe(drag);
   } else drag.o.group.position.set(drag.p0.x + g.x - drag.g0.x, drag.p0.y + g.y - drag.g0.y, drag.p0.z);
 });
 addEventListener('pointercancel', (e) => {
@@ -3194,7 +3205,7 @@ addEventListener('pointerup', async (e) => {
       const r = await op({op: 'move', id: d.o.id, m: getM(d.o.group), plate: d.o.plate});
       if (r?.msg) toast(r.msg);
     } else if (moved) {
-      const r = await op({op: 'set_wipe', x: d.x, y: d.y});
+      const r = await op({op: 'set_wipe', x: d.x, y: d.y, plate: d.i + 1});
       if (r?.msg) toast(r.msg);
     }
     drag = null;

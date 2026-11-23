@@ -324,7 +324,7 @@ def _do_slice(only=None):
         PROGRESS.update(stage="Starting", plate=i + 1, of=len(todo), t0=time.time())
         res, g = slice_plate(p)
         if res.get("ok"):
-            S.after_slice(res, g, store=False)  # preview data + real wipe tower footprint
+            S.after_slice(res, g, store=False, plate=p)  # preview data + real wipe tower footprint
         plates.append(res)
     if ABORT.is_set():
         PROGRESS["stage"] = ""

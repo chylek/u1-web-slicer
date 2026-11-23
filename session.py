@@ -1149,7 +1149,8 @@ class Session:
         boxes = [self.bbox(x) for x in self.on_plate(o.get("plate", 1)) if x is not o]
         if w["enabled"]:
             f = w["fp"]
-            boxes.append([w["x"] + f[0], w["x"] + f[1], w["y"] + f[2], w["y"] + f[3]])
+            wx, wy = self.wipe_xy(o.get("plate", 1))
+            boxes.append([wx + f[0], wx + f[1], wy + f[2], wy + f[3]])
         cx, cy = (b["x0"] + b["x1"]) / 2, (b["y0"] + b["y1"]) / 2
         best, bd = None, float("inf")
         x = b["x0"] + 2
@@ -1198,22 +1199,50 @@ class Session:
                         used |= paintree.used_states(c)
         return len(used) > 1 or any(e > n for e in used)
 
+    def wipe_xy(self, p):
+        """prime tower position on plate p (every plate has its own; plates not listed yet start at plate 1's spot)"""
+        w = self.st["wipe"]
+        pos = w.get("pos") or []
+        return tuple(pos[p - 1]) if p <= len(pos) else (w["x"], w["y"])
+
+    def _set_wipe_xy(self, p, x, y):
+        w = self.st["wipe"]
+        pos = w.setdefault("pos", [])
+        while len(pos) < max(p, self.nplates()):
+            pos.append([w["x"], w["y"]])
+        pos[p - 1] = [x, y]
+        w["x"], w["y"] = pos[0]  # x/y mirror plate 1
+
     def fix_wipe(self):
-        """tower on/off follows needs_tower(). When it appears (or is in the way) it goes to the first free corner,
-        else the nearest
-        free spot on a 5 mm grid - objects never move. No room: corner anyway. Returns "" | "moved" | "conflict"."""
-        w, b = self.st["wipe"], self.st["bed"]
-        was = w["enabled"]
+        """tower on/off follows needs_tower(). Per plate: when it appears (or is in the way) it goes to the first free
+        corner, else the nearest free spot on a 5 mm grid - objects never move. No room: corner anyway.
+        Returns "" | "moved" | "conflict" (worst over the plates)."""
+        w = self.st["wipe"]
         w["enabled"] = self.needs_tower()
         if not w["enabled"] or not self.st["objects"]:
             return ""
+        out = ""
+        for p in range(1, self.nplates() + 1):
+            r = self._fix_wipe_plate(p)
+            out = "conflict" if "conflict" in (out, r) else r or out
+        return out
+
+    def _fix_wipe_plate(self, p):
+        w, b = self.st["wipe"], self.st["bed"]
+        known = p <= len(w.get("pos") or [])
+        wx, wy = self.wipe_xy(p)
+        objs = self.on_plate(p)
+        if not objs:
+            if not known:
+                self._set_wipe_xy(p, wx, wy)
+            return ""
         f, gap = w["fp"], 4
-        boxes = [self.bbox(o) for o in self.st["objects"]]
+        boxes = [self.bbox(o) for o in objs]
         free = lambda x, y: all(
             x + f[1] + gap <= q[0] or x + f[0] - gap >= q[1] or y + f[3] + gap <= q[2] or y + f[2] - gap >= q[3]
             for q in boxes
         )
-        if was and free(w["x"], w["y"]):
+        if known and free(wx, wy):
             return ""
         xs, ys = (b["x0"] + 2 - f[0], b["x1"] - 2 - f[1]), (b["y0"] + 2 - f[2], b["y1"] - 2 - f[3])
         corners = [(x, y) for y in ys[::-1] for x in xs[::-1]]  # back-right, back-left, front-right, front-left
@@ -1223,7 +1252,7 @@ class Session:
             while x <= xs[1]:
                 y = ys[0]
                 while y <= ys[1]:
-                    d = (x - w["x"]) ** 2 + (y - w["y"]) ** 2
+                    d = (x - wx) ** 2 + (y - wy) ** 2
                     if d < bd and free(x, y):
                         bd, best = d, (x, y)
                     y += 5
@@ -1231,9 +1260,9 @@ class Session:
         res = "moved"
         if not best:
             best, res = corners[0], "conflict"
-        if (w["x"], w["y"]) == best and was:
+        if (wx, wy) == best and known:
             return "conflict" if res == "conflict" else ""
-        w["x"], w["y"] = best
+        self._set_wipe_xy(p, *best)
         return res
 
     # ---------- operations (all mutations go through here)
@@ -1845,7 +1874,7 @@ class Session:
                 self.st["plates"] = n_ - 1
                 msg = f"plate {p} deleted" + (f" with {len(gone)} objects" if gone else "")
             elif k == "set_wipe":
-                self.st["wipe"]["x"], self.st["wipe"]["y"] = float(r["x"]), float(r["y"])
+                self._set_wipe_xy(int(r.get("plate", 1)), float(r["x"]), float(r["y"]))
             elif k == "set_global":  # value None = back to the project value (the profile stays, shown as modified)
                 for a, v in r["settings"].items():
                     if a not in threemf.SETTINGS:
@@ -1974,6 +2003,7 @@ class Session:
                 "enabled": w["enabled"],
                 "x": round(w["x"], 1),
                 "y": round(w["y"], 1),
+                "plates": [[round(v, 1) for v in self.wipe_xy(p)] for p in range(1, self.nplates() + 1)],
                 "footprint": [round(v, 1) for v in w["fp"]],
             },
             "global_overrides": st["overrides"],
@@ -2147,11 +2177,12 @@ class Session:
         if plate is not None:
             geos, objs = self._merged(self.on_plate(plate))
             w = self.st["wipe"]
+            x, y = self.wipe_xy(plate)
             return threemf.build(
                 self.cfg,
                 geos,
                 objs,
-                {"x": w["x"], "y": w["y"]} if w["enabled"] else None,
+                {"x": x, "y": y} if w["enabled"] else None,
                 self.st["mix"],
                 self.st["overrides"],
             )
@@ -2164,7 +2195,7 @@ class Session:
             self.cfg,
             geos,
             objs,
-            {"x": w["x"], "y": w["y"]} if w["enabled"] else None,
+            {"pos": [self.wipe_xy(p) for p in range(1, self.nplates() + 1)]} if w["enabled"] else None,
             self.st["mix"],
             self.st["overrides"],
             plates=self.nplates(),
@@ -2180,7 +2211,7 @@ class Session:
             self._commit(record=False)
             return str(dst.relative_to(self.art))
 
-    def after_slice(self, res, gcode, store=True):
+    def after_slice(self, res, gcode, store=True, plate=1):
         """per plate (store=False): preview data + learn the real wipe tower footprint from the G-code; "
         "store=True: keep the result"""
         with self.lock:
@@ -2197,8 +2228,8 @@ class Session:
                 (gcode.parent / "preview.bin.gz").write_bytes(gzip.compress(b, 5))
                 w = self.st["wipe"]
                 if meta.get("tower") and w["enabled"]:
-                    t = meta["tower"]
-                    w["fp"] = [t[0] - w["x"], t[1] - w["x"], t[2] - w["y"], t[3] - w["y"]]
+                    t, (wx, wy) = meta["tower"], self.wipe_xy(plate)
+                    w["fp"] = [t[0] - wx, t[1] - wx, t[2] - wy, t[3] - wy]
             if store:
                 self.st["result"] = res
                 self._commit(record=False)

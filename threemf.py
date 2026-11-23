@@ -223,6 +223,7 @@ def parse(data):
         "wipe": {
             "x": float(cfg["wipe_tower_x"][0]),
             "y": float(cfg["wipe_tower_y"][0]),
+            "pos": [[float(x), float(y)] for x, y in zip(cfg["wipe_tower_x"], cfg["wipe_tower_y"])],
             "w": float(cfg["prime_tower_width"]),
             "enabled": cfg.get("enable_prime_tower") == "1",
         },
@@ -396,7 +397,8 @@ def build(cfg, geos, objects, wipe=None, mix=None, settings=None, plates=None):
     ):  # Full Spectrum mixes: rows "a,b,enabled,custom,pctB" joined by ';'; virtual ids follow the physical ones
         cfg["mixed_filament_definitions"] = mix
     if wipe:
-        cfg["wipe_tower_x"], cfg["wipe_tower_y"] = [str(wipe["x"])] * (plates or 1), [str(wipe["y"])] * (plates or 1)
+        pos = wipe.get("pos") or [(wipe["x"], wipe["y"])] * (plates or 1)  # one (x, y) per plate
+        cfg["wipe_tower_x"], cfg["wipe_tower_y"] = [str(p[0]) for p in pos], [str(p[1]) for p in pos]
     bed_ = bed(cfg)
     inst = {}
     model = [

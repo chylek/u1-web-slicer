@@ -513,3 +513,19 @@ def test_filament_count_and_colour(new_session):
     s.op({"op": "mix_add", "a": 1, "b": 2})
     with pytest.raises(ValueError):
         s.op({"op": "set_filament_count", "count": 3})
+
+
+def test_prime_tower_is_per_plate(new_session):
+    s = new_session()
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10], "ext": 2})
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10], "ext": 3})  # two colours -> tower needed
+    s.op({"op": "add_plate"})
+    s.op({"op": "add_primitive", "shape": "box", "size": [10, 10, 10], "ext": 3, "plate": 2})
+    assert s.nplates() == 2
+    s.op({"op": "set_wipe", "x": 150, "y": 100, "plate": 2})
+    a, b = s.wipe_xy(1), s.wipe_xy(2)
+    assert b == (150, 100) and a != b  # moving plate 2's tower leaves plate 1's alone
+    s.op({"op": "set_wipe", "x": 20, "y": 30, "plate": 1})
+    assert s.wipe_xy(2) == (150, 100)
+    ui, _ = threemf.parse(s.build())  # saved as one position per plate
+    assert ui["wipe"]["pos"][:2] == [[20, 30], [150, 100]]
